@@ -214,9 +214,10 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     }
   }
   
-  // Check if player should declare "Niko Kadi"
-  if (currentPlayer.hand.length === 1) {
-    currentPlayer.nikoKadiCalled = false; // Reset for next declaration
+  // CRITICAL: Reset Niko Kadi status if player doesn't finish
+  if (currentPlayer.hand.length > 1 && currentPlayer.nikoKadiCalled) {
+    currentPlayer.nikoKadiCalled = false;
+    newState.turnHistory.push(`${currentPlayer.name}'s Niko Kadi status reset - didn't finish`);
   }
   
   // Move to next player (unless it's a jump or pending question)
@@ -245,11 +246,17 @@ export function drawCard(gameState: GameState, playerIndex: number): GameState {
     newState.turnHistory.push(`${player.name} drew a card`);
   }
   
+  // CRITICAL: Reset Niko Kadi status when drawing cards
+  if (player.nikoKadiCalled) {
+    player.nikoKadiCalled = false;
+    newState.turnHistory.push(`${player.name}'s Niko Kadi status reset - drew a card`);
+  }
+  
   // CRITICAL: Question cards ALWAYS need an answer - drawing doesn't clear the question
-  // The question remains pending until properly answered
+  // BUT turn only passes if it's NOT a pending question scenario
   if (newState.pendingQuestion) {
     newState.turnHistory.push(`${player.name} drew a card but question still needs an answer`);
-    // Turn moves to next player, but question remains pending
+    // IMPORTANT: Turn moves to next player, but question remains pending
     nextTurn(newState);
   } else {
     // Normal draw - turn goes to next player
@@ -284,6 +291,12 @@ export function handlePenaltyDraw(gameState: GameState): GameState {
     
     newState.turnHistory.push(`${player.name} drew ${penaltyAmount} penalty cards`);
     newState.drawStack = 0; // Clear penalty stack
+    
+    // CRITICAL: Reset Niko Kadi status when drawing penalty cards
+    if (player.nikoKadiCalled) {
+      player.nikoKadiCalled = false;
+      newState.turnHistory.push(`${player.name}'s Niko Kadi status reset - drew penalty cards`);
+    }
     
     // Turn automatically moves to next player after penalty draw
     nextTurn(newState);
@@ -354,6 +367,7 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
   
   // CRITICAL: If there's a pending question, AI must answer it or draw
   // Question ALWAYS needs an answer - no exceptions!
+  // Turn should NOT pass until question is resolved
   if (newState.pendingQuestion) {
     // Look for answer cards or another question card
     const answerCards = currentPlayer.hand.filter(card => {
@@ -367,7 +381,7 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
       const selectedCard = answerCards[0];
       return playCards(newState, { cardIds: [selectedCard.id] });
     } else {
-      // No answer available, must draw - but question remains pending!
+      // No answer available, must draw - question remains pending, turn passes
       return drawCard(newState, newState.currentPlayerIndex);
     }
   }
