@@ -117,7 +117,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
       {/* Main Game Area - Scrollable */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Opponent (Player 2) - MUCH MORE VISIBLE Card Backs */}
+          {/* Opponent (Player 2) - CRYSTAL CLEAR Coat of Arms */}
           <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
             <div className="flex items-center justify-between mb-2">
               <h3 className={`font-bold ${gameState.currentPlayerIndex === 1 ? 'text-red-400' : 'text-gray-300'}`}>
@@ -137,17 +137,17 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
               </div>
             </div>
             
-            {/* DRAMATICALLY ENHANCED Card Backs with VERY VISIBLE Coat of Arms */}
+            {/* CRYSTAL CLEAR Card Backs with HIGH-QUALITY Coat of Arms */}
             <div className="flex flex-wrap gap-1">
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
                   className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden shadow-xl"
                 >
-                  {/* SUPER PROMINENT Kenyan Coat of Arms - Much larger, brighter, and more visible */}
+                  {/* CRYSTAL CLEAR HIGH-QUALITY Kenyan Coat of Arms */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <img 
-                      src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
+                      src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Coat_of_arms_of_Kenya_%28Official%29.svg/1200px-Coat_of_arms_of_Kenya_%28Official%29.svg.png" 
                       alt="Kenya Coat of Arms"
                       className="w-10 h-10 object-contain opacity-95"
                       style={{

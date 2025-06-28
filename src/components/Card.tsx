@@ -60,7 +60,7 @@ export const Card: React.FC<CardProps> = ({
       <div className="flex-1 flex items-center justify-center relative">
         <div className="absolute inset-0 flex items-center justify-center opacity-15">
           <img 
-            src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
+            src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Coat_of_arms_of_Kenya_%28Official%29.svg/1200px-Coat_of_arms_of_Kenya_%28Official%29.svg.png" 
             alt="Kenya Coat of Arms"
             className="w-8 h-8 object-contain filter grayscale"
           />

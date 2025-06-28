@@ -25,7 +25,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ gameState, onDrawCard }) =
             {/* VERY PROMINENT Kenyan coat of arms - Much larger and brighter */}
             <div className="absolute inset-0 flex items-center justify-center">
               <img 
-                src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Coat_of_arms_of_Kenya_%28Official%29.svg/1200px-Coat_of_arms_of_Kenya_%28Official%29.svg.png" 
                 alt="Kenya Coat of Arms"
                 className="w-16 h-16 object-contain opacity-90 filter brightness-150 contrast-125 saturate-150"
                 style={{
