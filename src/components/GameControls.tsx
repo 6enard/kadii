@@ -23,6 +23,33 @@ export const GameControls: React.FC<GameControlsProps> = ({
   const hasPenalty = gameState.drawStack > 0;
   const isMyTurn = gameState.currentPlayerIndex === 0; // Assuming player 1 is always the human player
   
+  // Get card names for display
+  const getSelectedCardNames = () => {
+    if (selectedCards.length === 0) return '';
+    
+    const cards = selectedCards.map(id => 
+      currentPlayer.hand.find(c => c.id === id)
+    ).filter(Boolean);
+    
+    if (cards.length === 1) {
+      return `${cards[0]!.rank}${cards[0]!.suit}`;
+    }
+    
+    // Group by rank for better display
+    const rankGroups = new Map<string, number>();
+    cards.forEach(card => {
+      if (card) {
+        rankGroups.set(card.rank, (rankGroups.get(card.rank) || 0) + 1);
+      }
+    });
+    
+    const groupStrings = Array.from(rankGroups.entries()).map(([rank, count]) => 
+      count > 1 ? `${count}×${rank}` : rank
+    );
+    
+    return groupStrings.join(', ');
+  };
+  
   return (
     <div className="space-y-4">
       {/* Dedicated Niko Kadi Button - Always visible */}
@@ -54,7 +81,16 @@ export const GameControls: React.FC<GameControlsProps> = ({
             }
           `}
         >
-          Play {selectedCards.length > 0 ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}` : 'Cards'}
+          {selectedCards.length > 0 ? (
+            <span>
+              Play {selectedCards.length} Card{selectedCards.length > 1 ? 's' : ''} 
+              <span className="text-xs block opacity-90">
+                ({getSelectedCardNames()})
+              </span>
+            </span>
+          ) : (
+            'Select Cards to Play'
+          )}
         </button>
         
         {/* Draw Penalty Button */}
@@ -69,23 +105,48 @@ export const GameControls: React.FC<GameControlsProps> = ({
         )}
         
         {/* Game Status Info */}
-        <div className="flex items-center space-x-4 text-sm text-gray-600">
-          <span>Selected: {selectedCards.length}</span>
+        <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600 w-full">
+          <span className="bg-blue-100 px-3 py-1 rounded-full">
+            Selected: {selectedCards.length} card{selectedCards.length !== 1 ? 's' : ''}
+          </span>
+          
+          {selectedCards.length > 0 && (
+            <span className="bg-green-100 px-3 py-1 rounded-full text-green-700">
+              {getSelectedCardNames()}
+            </span>
+          )}
+          
           {gameState.pendingQuestion && (
-            <span className="text-red-600 font-bold animate-pulse">
+            <span className="text-red-600 font-bold animate-pulse bg-red-100 px-3 py-1 rounded-full">
               🚨 QUESTION MUST BE ANSWERED! 🚨
             </span>
           )}
+          
           {!isMyTurn && (
-            <span className="text-blue-600 font-bold">🤖 Computer's turn</span>
+            <span className="text-blue-600 font-bold bg-blue-100 px-3 py-1 rounded-full">
+              🤖 Computer's turn
+            </span>
           )}
+          
           {hasPenalty && (
-            <span className="text-red-600 font-bold">
+            <span className="text-red-600 font-bold bg-red-100 px-3 py-1 rounded-full">
               ⚡ Penalty: {gameState.drawStack} cards - Counter with 2, 3, or A!
             </span>
           )}
         </div>
       </div>
+      
+      {/* Stacking Help */}
+      {selectedCards.length > 1 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="text-center text-blue-800">
+            <div className="font-semibold mb-1">🃏 Card Stacking Active!</div>
+            <div className="text-sm">
+              You can play multiple cards: same ranks (4♥ 4♠ 4♦) or valid sequences (Q♥ Q♠ 8♠)
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

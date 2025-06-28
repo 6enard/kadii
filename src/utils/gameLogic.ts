@@ -92,23 +92,124 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
     return canPlayCard(cards[0], topCard, gameState.selectedSuit);
   }
   
-  // Multiple cards - check if they're all the same rank and at least one matches
+  // ENHANCED MULTIPLE CARD LOGIC
   if (cards.length > 1) {
-    // All cards must have the same rank
-    const firstRank = cards[0].rank;
-    const allSameRank = cards.every(card => card.rank === firstRank);
-    
-    if (!allSameRank) {
-      // Special case: Question + Answer combo
-      if (cards.length === 2) {
-        return isValidQuestionAnswerCombo(cards) && 
-               canPlayCard(cards[0], topCard, gameState.selectedSuit);
+    // Special case: Question + Answer combo (exactly 2 cards)
+    if (cards.length === 2) {
+      const isQuestionAnswerCombo = isValidQuestionAnswerCombo(cards);
+      if (isQuestionAnswerCombo && canPlayCard(cards[0], topCard, gameState.selectedSuit)) {
+        return true;
       }
+    }
+    
+    // ENHANCED: Allow mixed combinations as long as at least one card can be played
+    // and all cards follow valid stacking rules
+    
+    // Check if at least one card can be played on the current top card
+    const hasPlayableCard = cards.some(card => canPlayCard(card, topCard, gameState.selectedSuit));
+    if (!hasPlayableCard) {
       return false;
     }
     
-    // At least one card must be playable
-    return cards.some(card => canPlayCard(card, topCard, gameState.selectedSuit));
+    // STACKING RULES:
+    // 1. All cards of same rank (e.g., 4♥ 4♠ 4♦)
+    // 2. Mixed cards where each subsequent card can be played on the previous one
+    
+    // Rule 1: All same rank
+    const firstRank = cards[0].rank;
+    const allSameRank = cards.every(card => card.rank === firstRank);
+    if (allSameRank) {
+      return true; // Valid if at least one can be played (already checked above)
+    }
+    
+    // Rule 2: Sequential validity - each card must be playable on the previous one
+    // Sort cards to find the best playing order
+    const sortedCards = [...cards];
+    
+    // Try to find a valid sequence
+    for (let i = 0; i < sortedCards.length; i++) {
+      const permutation = [...sortedCards];
+      // Move current card to front
+      [permutation[0], permutation[i]] = [permutation[i], permutation[0]];
+      
+      // Check if this permutation works
+      if (canPlayCard(permutation[0], topCard, gameState.selectedSuit)) {
+        let isValidSequence = true;
+        let currentCard = permutation[0];
+        
+        for (let j = 1; j < permutation.length; j++) {
+          const nextCard = permutation[j];
+          // Check if next card can be played on current card
+          if (!canPlayCard(nextCard, currentCard, null)) {
+            // Special case: if both are same rank, allow it
+            if (nextCard.rank !== currentCard.rank) {
+              isValidSequence = false;
+              break;
+            }
+          }
+          currentCard = nextCard;
+        }
+        
+        if (isValidSequence) {
+          return true;
+        }
+      }
+    }
+    
+    // Additional rule: Allow cards that share rank with any card in the sequence
+    // e.g., Q♥ Q♠ 8♠ is valid if Q♥ can be played and 8♠ matches Q♠
+    const rankGroups = new Map<string, Card[]>();
+    cards.forEach(card => {
+      if (!rankGroups.has(card.rank)) {
+        rankGroups.set(card.rank, []);
+      }
+      rankGroups.get(card.rank)!.push(card);
+    });
+    
+    // If we have multiple rank groups, check if they can form a valid chain
+    if (rankGroups.size > 1) {
+      const ranks = Array.from(rankGroups.keys());
+      
+      // Check if we can create a valid sequence using the rank groups
+      for (const startRank of ranks) {
+        const startCards = rankGroups.get(startRank)!;
+        const playableStartCards = startCards.filter(card => 
+          canPlayCard(card, topCard, gameState.selectedSuit)
+        );
+        
+        if (playableStartCards.length > 0) {
+          // We have a valid starting point, now check if other ranks can connect
+          let canConnectAll = true;
+          const usedRanks = new Set([startRank]);
+          let currentTestCard = playableStartCards[0];
+          
+          for (const rank of ranks) {
+            if (usedRanks.has(rank)) continue;
+            
+            const rankCards = rankGroups.get(rank)!;
+            const canConnect = rankCards.some(card => 
+              canPlayCard(card, currentTestCard, null) || 
+              card.rank === currentTestCard.rank ||
+              card.suit === currentTestCard.suit
+            );
+            
+            if (canConnect) {
+              usedRanks.add(rank);
+              currentTestCard = rankCards[0];
+            } else {
+              canConnectAll = false;
+              break;
+            }
+          }
+          
+          if (canConnectAll && usedRanks.size === ranks.length) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
   }
   
   return false;
@@ -127,84 +228,122 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     !options.cardIds.includes(card.id)
   );
   
-  // Add cards to discard pile
-  newState.discardPile.push(...playedCards);
+  // ENHANCED: Sort played cards for optimal play order
+  const sortedPlayedCards = sortPlayedCards(playedCards, getTopCard(newState), newState.selectedSuit);
+  
+  // Add cards to discard pile in the sorted order
+  newState.discardPile.push(...sortedPlayedCards);
   
   // Handle special card effects based on the last played card
-  const lastPlayedCard = playedCards[playedCards.length - 1];
+  const lastPlayedCard = sortedPlayedCards[sortedPlayedCards.length - 1];
   const category = getCardCategory(lastPlayedCard.rank);
   
   let skipNextTurn = false;
   
-  switch (category) {
-    case 'penalty':
-      // Add penalty for each penalty card played
-      const totalPenalty = playedCards.reduce((sum, card) => {
-        return sum + getPenaltyValue(card.rank);
-      }, 0);
-      newState.drawStack += totalPenalty;
-      newState.turnHistory.push(`${currentPlayer.name} played penalty cards (+${totalPenalty} cards)`);
-      break;
-      
-    case 'wild':
-      if (options.declaredSuit) {
-        newState.selectedSuit = options.declaredSuit;
-        newState.turnHistory.push(`${currentPlayer.name} played Ace and chose ${options.declaredSuit}`);
-      } else {
-        newState.gamePhase = 'selectingSuit';
-        return newState;
-      }
-      // Wild cancels any pending penalty AND answers questions!
-      if (newState.drawStack > 0) {
-        newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace`);
-        newState.drawStack = 0;
-      }
-      if (newState.pendingQuestion) {
-        newState.pendingQuestion = false;
-        newState.turnHistory.push(`${currentPlayer.name} answered question with Ace (wild card)`);
-      }
-      break;
-      
-    case 'question':
-      if (playedCards.length === 1) {
-        // Question card played - same player must answer immediately
-        newState.pendingQuestion = true;
-        newState.turnHistory.push(`${currentPlayer.name} played a question card - must answer immediately`);
-        // Don't change turn - same player continues
-        return newState;
-      } else {
-        // Question + Answer combo
-        newState.pendingQuestion = false;
-        newState.turnHistory.push(`${currentPlayer.name} played question + answer combo`);
-      }
-      break;
-      
-    case 'jump':
-      // In 2-player mode, current player plays again (skip opponent's turn)
-      skipNextTurn = true;
-      newState.turnHistory.push(`${currentPlayer.name} played Jack - plays again!`);
-      break;
-      
-    case 'kickback':
-      // King means turn goes to next player (not back to current player)
-      newState.turnHistory.push(`${currentPlayer.name} played King`);
-      break;
-      
-    default:
-      if (newState.pendingQuestion) {
-        newState.pendingQuestion = false;
-        newState.turnHistory.push(`${currentPlayer.name} answered the question`);
-      }
+  // Calculate total effects for multiple cards
+  let totalPenalty = 0;
+  let hasWild = false;
+  let hasJump = false;
+  let hasKickback = false;
+  let hasQuestion = false;
+  
+  sortedPlayedCards.forEach(card => {
+    const cardCategory = getCardCategory(card.rank);
+    switch (cardCategory) {
+      case 'penalty':
+        totalPenalty += getPenaltyValue(card.rank);
+        break;
+      case 'wild':
+        hasWild = true;
+        break;
+      case 'jump':
+        hasJump = true;
+        break;
+      case 'kickback':
+        hasKickback = true;
+        break;
+      case 'question':
+        hasQuestion = true;
+        break;
+    }
+  });
+  
+  // Apply effects based on what was played
+  if (totalPenalty > 0) {
+    newState.drawStack += totalPenalty;
+    newState.turnHistory.push(`${currentPlayer.name} played ${sortedPlayedCards.length} penalty card(s) (+${totalPenalty} cards)`);
+  }
+  
+  if (hasWild) {
+    if (options.declaredSuit) {
+      newState.selectedSuit = options.declaredSuit;
+      newState.turnHistory.push(`${currentPlayer.name} played Ace(s) and chose ${options.declaredSuit}`);
+    } else {
+      newState.gamePhase = 'selectingSuit';
+      return newState;
+    }
+    // Wild cancels any pending penalty AND answers questions!
+    if (newState.drawStack > 0) {
+      newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace(s)`);
+      newState.drawStack = 0;
+    }
+    if (newState.pendingQuestion) {
+      newState.pendingQuestion = false;
+      newState.turnHistory.push(`${currentPlayer.name} answered question with Ace(s) (wild card)`);
+    }
+  }
+  
+  if (hasQuestion && !hasWild) {
+    if (sortedPlayedCards.length === 1 || !sortedPlayedCards.some(card => getCardCategory(card.rank) === 'answer')) {
+      // Question card played without answer - same player must answer immediately
+      newState.pendingQuestion = true;
+      newState.turnHistory.push(`${currentPlayer.name} played question card(s) - must answer immediately`);
+      // Don't change turn - same player continues
+      return newState;
+    } else {
+      // Question + Answer combo or question answered by other cards
+      newState.pendingQuestion = false;
+      newState.turnHistory.push(`${currentPlayer.name} played question + answer combo`);
+    }
+  }
+  
+  if (hasJump) {
+    // In 2-player mode, current player plays again (skip opponent's turn)
+    skipNextTurn = true;
+    newState.turnHistory.push(`${currentPlayer.name} played Jack(s) - plays again!`);
+  }
+  
+  if (hasKickback) {
+    newState.turnHistory.push(`${currentPlayer.name} played King(s)`);
+  }
+  
+  // Handle answer cards
+  if (newState.pendingQuestion && !hasWild && !hasQuestion) {
+    const hasAnswerCard = sortedPlayedCards.some(card => {
+      const cardCategory = getCardCategory(card.rank);
+      return cardCategory === 'answer' || cardCategory === 'question';
+    });
+    
+    if (hasAnswerCard) {
+      newState.pendingQuestion = false;
+      newState.turnHistory.push(`${currentPlayer.name} answered the question`);
+    }
   }
   
   // Reset selected suit if not wild card
-  if (category !== 'wild') {
+  if (!hasWild) {
     newState.selectedSuit = null;
+  }
+  
+  // Log the play
+  if (sortedPlayedCards.length > 1 && !newState.turnHistory[newState.turnHistory.length - 1].includes('penalty') && !newState.turnHistory[newState.turnHistory.length - 1].includes('Ace')) {
+    const cardNames = sortedPlayedCards.map(card => `${card.rank}${card.suit}`).join(', ');
+    newState.turnHistory.push(`${currentPlayer.name} played multiple cards: ${cardNames}`);
   }
   
   // Check for win condition
   if (currentPlayer.hand.length === 0) {
-    if (currentPlayer.nikoKadiCalled && canWinWithCards(playedCards)) {
+    if (currentPlayer.nikoKadiCalled && canWinWithCards(sortedPlayedCards)) {
       newState.winner = currentPlayer.name;
       newState.gamePhase = 'gameOver';
       newState.turnHistory.push(`${currentPlayer.name} wins the game!`);
@@ -228,6 +367,43 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   }
   
   return newState;
+}
+
+// Helper function to sort played cards for optimal play order
+function sortPlayedCards(cards: Card[], topCard: Card, selectedSuit: string | null): Card[] {
+  if (cards.length <= 1) return cards;
+  
+  // Find the best starting card (one that can be played on top card)
+  const playableFirst = cards.filter(card => canPlayCard(card, topCard, selectedSuit as any));
+  
+  if (playableFirst.length === 0) return cards;
+  
+  // Start with a playable card
+  const result = [playableFirst[0]];
+  const remaining = cards.filter(card => card.id !== playableFirst[0].id);
+  
+  // Add remaining cards in order of playability
+  while (remaining.length > 0) {
+    const currentTop = result[result.length - 1];
+    
+    // Find next card that can be played on current top
+    const nextPlayable = remaining.find(card => 
+      canPlayCard(card, currentTop, null) || 
+      card.rank === currentTop.rank ||
+      card.suit === currentTop.suit
+    );
+    
+    if (nextPlayable) {
+      result.push(nextPlayable);
+      remaining.splice(remaining.indexOf(nextPlayable), 1);
+    } else {
+      // Add remaining cards in original order
+      result.push(...remaining);
+      break;
+    }
+  }
+  
+  return result;
 }
 
 export function drawCard(gameState: GameState, playerIndex: number): GameState {
@@ -393,12 +569,10 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
     }
   }
   
-  // Find playable cards
-  const playableCards = currentPlayer.hand.filter(card => 
-    canPlayerPlay(newState, [card.id])
-  );
+  // ENHANCED AI: Look for multiple card opportunities
+  const playableCardCombinations = findPlayableCardCombinations(currentPlayer.hand, newState);
   
-  if (playableCards.length === 0) {
+  if (playableCardCombinations.length === 0) {
     // No playable cards, must draw
     if (newState.drawStack > 0) {
       return handlePenaltyDraw(newState);
@@ -408,109 +582,146 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
   }
   
   // AI strategy based on difficulty
-  let selectedCard: Card;
+  let selectedCombination: string[];
   
   switch (difficulty) {
     case 'easy':
-      // Easy: Play first available card
-      selectedCard = playableCards[0];
+      // Easy: Play first available combination
+      selectedCombination = playableCardCombinations[0];
       break;
       
     case 'medium':
-      // Medium: Prefer special cards, avoid giving opponent advantages
-      selectedCard = selectMediumAICard(playableCards, newState);
+      // Medium: Prefer combinations that get rid of more cards
+      selectedCombination = selectMediumAICombination(playableCardCombinations, currentPlayer.hand, newState);
       break;
       
     case 'hard':
       // Hard: Strategic play, consider opponent's hand size and game state
-      selectedCard = selectHardAICard(playableCards, newState);
+      selectedCombination = selectHardAICombination(playableCardCombinations, currentPlayer.hand, newState);
       break;
       
     default:
-      selectedCard = playableCards[0];
+      selectedCombination = playableCardCombinations[0];
   }
   
-  // Check for multiple cards of same rank
-  const sameRankCards = currentPlayer.hand.filter(card => 
-    card.rank === selectedCard.rank && canPlayerPlay(newState, [card.id])
+  // Check if any selected card is an Ace (wild card)
+  const selectedCards = selectedCombination.map(id => 
+    currentPlayer.hand.find(card => card.id === id)!
   );
   
-  const cardsToPlay = difficulty === 'hard' && sameRankCards.length > 1 
-    ? sameRankCards.slice(0, Math.min(3, sameRankCards.length)) // Play up to 3 of same rank
-    : [selectedCard];
+  const hasAce = selectedCards.some(card => card.rank === 'A');
   
   // Handle Ace (wild card) suit selection
-  if (selectedCard.rank === 'A') {
+  if (hasAce) {
     const bestSuit = selectBestSuit(currentPlayer.hand, difficulty);
     return playCards(newState, { 
-      cardIds: cardsToPlay.map(c => c.id), 
+      cardIds: selectedCombination, 
       declaredSuit: bestSuit 
     });
   }
   
-  return playCards(newState, { cardIds: cardsToPlay.map(c => c.id) });
+  return playCards(newState, { cardIds: selectedCombination });
 }
 
-function selectMediumAICard(playableCards: Card[], gameState: GameState): Card {
-  // Prefer special cards that benefit AI
-  const specialCards = playableCards.filter(card => {
-    const category = getCardCategory(card.rank);
-    return ['penalty', 'jump', 'wild'].includes(category);
-  });
+// Helper function to find all playable card combinations
+function findPlayableCardCombinations(hand: Card[], gameState: GameState): string[][] {
+  const combinations: string[][] = [];
   
-  if (specialCards.length > 0) {
-    return specialCards[0];
+  // Single cards
+  for (const card of hand) {
+    if (canPlayerPlay(gameState, [card.id])) {
+      combinations.push([card.id]);
+    }
   }
   
-  // Otherwise play highest value card
-  const cardValues = { 'A': 14, 'K': 13, 'Q': 12, 'J': 11, '10': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2 };
-  return playableCards.sort((a, b) => (cardValues[b.rank] || 0) - (cardValues[a.rank] || 0))[0];
+  // Same rank combinations
+  const rankGroups = new Map<string, Card[]>();
+  hand.forEach(card => {
+    if (!rankGroups.has(card.rank)) {
+      rankGroups.set(card.rank, []);
+    }
+    rankGroups.get(card.rank)!.push(card);
+  });
+  
+  rankGroups.forEach((cards, rank) => {
+    if (cards.length > 1) {
+      // Try all combinations of same rank cards
+      for (let i = 2; i <= cards.length; i++) {
+        const cardIds = cards.slice(0, i).map(c => c.id);
+        if (canPlayerPlay(gameState, cardIds)) {
+          combinations.push(cardIds);
+        }
+      }
+    }
+  });
+  
+  // Mixed combinations (limited to avoid performance issues)
+  if (hand.length <= 8) { // Only try mixed combinations for smaller hands
+    for (let i = 0; i < hand.length - 1; i++) {
+      for (let j = i + 1; j < hand.length; j++) {
+        const cardIds = [hand[i].id, hand[j].id];
+        if (canPlayerPlay(gameState, cardIds)) {
+          combinations.push(cardIds);
+        }
+        
+        // Try 3-card combinations
+        for (let k = j + 1; k < hand.length && k < i + 4; k++) {
+          const threeCardIds = [hand[i].id, hand[j].id, hand[k].id];
+          if (canPlayerPlay(gameState, threeCardIds)) {
+            combinations.push(threeCardIds);
+          }
+        }
+      }
+    }
+  }
+  
+  return combinations;
 }
 
-function selectHardAICard(playableCards: Card[], gameState: GameState): Card {
+function selectMediumAICombination(combinations: string[][], hand: Card[], gameState: GameState): string[] {
+  // Prefer combinations that get rid of more cards
+  combinations.sort((a, b) => b.length - a.length);
+  
+  // Among combinations of same length, prefer special cards
+  const topLength = combinations[0].length;
+  const topCombinations = combinations.filter(combo => combo.length === topLength);
+  
+  for (const combo of topCombinations) {
+    const cards = combo.map(id => hand.find(card => card.id === id)!);
+    const hasSpecialCard = cards.some(card => {
+      const category = getCardCategory(card.rank);
+      return ['penalty', 'jump', 'wild'].includes(category);
+    });
+    
+    if (hasSpecialCard) {
+      return combo;
+    }
+  }
+  
+  return combinations[0];
+}
+
+function selectHardAICombination(combinations: string[][], hand: Card[], gameState: GameState): string[] {
   const opponent = gameState.players.find(p => p.name !== 'Computer')!;
   const opponentHandSize = opponent.hand.length;
   
-  // If opponent has few cards, prioritize defensive play
+  // If opponent has few cards, prioritize defensive combinations
   if (opponentHandSize <= 2) {
-    // Prefer penalty cards to slow opponent down
-    const penaltyCards = playableCards.filter(card => 
-      getCardCategory(card.rank) === 'penalty'
-    );
-    if (penaltyCards.length > 0) {
-      return penaltyCards[0];
+    const penaltyCombinations = combinations.filter(combo => {
+      const cards = combo.map(id => hand.find(card => card.id === id)!);
+      return cards.some(card => getCardCategory(card.rank) === 'penalty');
+    });
+    
+    if (penaltyCombinations.length > 0) {
+      // Prefer larger penalty combinations
+      penaltyCombinations.sort((a, b) => b.length - a.length);
+      return penaltyCombinations[0];
     }
   }
   
-  // If AI has many cards, prioritize getting rid of cards quickly
-  const currentPlayer = getCurrentPlayer(gameState);
-  if (currentPlayer.hand.length > 5) {
-    // Look for cards with same rank to play multiple
-    const rankCounts = new Map<string, Card[]>();
-    playableCards.forEach(card => {
-      if (!rankCounts.has(card.rank)) {
-        rankCounts.set(card.rank, []);
-      }
-      rankCounts.get(card.rank)!.push(card);
-    });
-    
-    // Find rank with most cards
-    let bestRank = '';
-    let maxCount = 0;
-    rankCounts.forEach((cards, rank) => {
-      if (cards.length > maxCount) {
-        maxCount = cards.length;
-        bestRank = rank;
-      }
-    });
-    
-    if (maxCount > 1) {
-      return rankCounts.get(bestRank)![0];
-    }
-  }
-  
-  // Default to medium strategy
-  return selectMediumAICard(playableCards, gameState);
+  // Prefer combinations that get rid of more cards
+  combinations.sort((a, b) => b.length - a.length);
+  return combinations[0];
 }
 
 function selectBestSuit(hand: Card[], difficulty: AIDifficulty): string {
