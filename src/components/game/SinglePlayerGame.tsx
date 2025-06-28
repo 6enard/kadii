@@ -122,110 +122,131 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     .map(card => card.id) : [];
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-900 flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-900 flex flex-col overflow-hidden">
+      {/* Fixed Header - Compact */}
+      <div className="flex-shrink-0 p-3 bg-black bg-opacity-20 backdrop-blur-sm border-b border-white border-opacity-10">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button
             onClick={onBackToMenu}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors text-sm"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
             <span>Back</span>
           </button>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">Kadi vs Computer</h1>
-            <p className="text-emerald-200 text-sm">
+            <h1 className="text-xl font-bold text-white">Kadi vs Computer</h1>
+            <p className="text-emerald-200 text-xs">
               Difficulty: <span className="capitalize font-semibold">{gameState.aiDifficulty}</span>
             </p>
           </div>
           <button
             onClick={() => setShowDifficultyModal(true)}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors text-sm"
           >
-            <Settings size={20} />
+            <Settings size={18} />
             <span>Settings</span>
           </button>
         </div>
       </div>
 
-      {/* Main Game Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Computer Player - Compact */}
-          <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className={`font-bold ${isComputerTurn ? 'text-blue-400' : 'text-gray-300'}`}>
-                🤖 Computer
-                {isComputerTurn && <span className="ml-2 text-xs bg-blue-600 px-2 py-1 rounded animate-pulse">Thinking...</span>}
-              </h3>
-              
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="bg-gray-600 px-2 py-1 rounded text-white">
-                  {gameState.players[1].hand.length} cards
-                </span>
+      {/* Main Game Container - Contained and Scrollable */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col space-y-3 min-h-0">
+          
+          {/* Computer Player - Ultra Compact */}
+          <div className="flex-shrink-0 bg-gray-800 bg-opacity-50 rounded-lg p-2 border border-gray-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <h3 className={`font-bold text-sm ${isComputerTurn ? 'text-blue-400' : 'text-gray-300'}`}>
+                  🤖 Computer
+                  {isComputerTurn && <span className="ml-2 text-xs bg-blue-600 px-2 py-1 rounded animate-pulse">Thinking...</span>}
+                </h3>
                 {gameState.players[1].nikoKadiCalled && (
-                  <span className="bg-yellow-500 px-2 py-1 rounded font-bold text-black">
+                  <span className="bg-yellow-500 px-2 py-1 rounded text-xs font-bold text-black">
                     Niko Kadi!
                   </span>
                 )}
               </div>
-            </div>
-            
-            {/* Hidden cards - Compact */}
-            <div className="flex flex-wrap gap-1">
-              {gameState.players[1].hand.map((_, index) => (
-                <div
-                  key={index}
-                  className="w-12 h-16 bg-blue-900 rounded-lg border border-blue-700 flex items-center justify-center"
-                >
-                  <div className="text-white text-xs font-bold">K</div>
+              
+              <div className="flex items-center space-x-2">
+                <span className="bg-gray-600 px-2 py-1 rounded text-white text-xs">
+                  {gameState.players[1].hand.length} cards
+                </span>
+                {/* Mini card representation */}
+                <div className="flex -space-x-1">
+                  {gameState.players[1].hand.slice(0, Math.min(8, gameState.players[1].hand.length)).map((_, index) => (
+                    <div
+                      key={index}
+                      className="w-6 h-8 bg-blue-900 rounded border border-blue-700 flex items-center justify-center"
+                    >
+                      <div className="text-white text-xs font-bold">K</div>
+                    </div>
+                  ))}
+                  {gameState.players[1].hand.length > 8 && (
+                    <div className="text-white text-xs ml-1">+{gameState.players[1].hand.length - 8}</div>
+                  )}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
           
           {/* Game Board - Compact */}
-          <GameBoard
-            gameState={gameState}
-            onDrawCard={handleDrawCard}
-          />
+          <div className="flex-shrink-0">
+            <GameBoard
+              gameState={gameState}
+              onDrawCard={handleDrawCard}
+            />
+          </div>
           
-          {/* Game Controls - Always visible */}
-          <GameControls
-            gameState={gameState}
-            selectedCards={selectedCards}
-            onPlayCards={handlePlayCards}
-            onDeclareNikoKadi={handleDeclareNikoKadi}
-            onDrawPenalty={handleDrawPenalty}
-            canPlaySelected={canPlaySelected}
-          />
+          {/* Game Controls - Compact */}
+          <div className="flex-shrink-0">
+            <GameControls
+              gameState={gameState}
+              selectedCards={selectedCards}
+              onPlayCards={handlePlayCards}
+              onDeclareNikoKadi={handleDeclareNikoKadi}
+              onDrawPenalty={handleDrawPenalty}
+              canPlaySelected={canPlaySelected}
+            />
+          </div>
           
-          {/* Player 1 (Current User) */}
-          <PlayerHand
-            player={gameState.players[0]}
-            isCurrentPlayer={gameState.currentPlayerIndex === 0}
-            selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
-            playableCards={playableCards}
-            onCardClick={handleCardClick}
-            isMyTurn={!isComputerTurn}
-          />
+          {/* Player Hand - Flexible Height */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <PlayerHand
+              player={gameState.players[0]}
+              isCurrentPlayer={gameState.currentPlayerIndex === 0}
+              selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
+              playableCards={playableCards}
+              onCardClick={handleCardClick}
+              isMyTurn={!isComputerTurn}
+            />
+          </div>
           
-          {/* Game Status - Compact */}
-          <GameStatus gameState={gameState} onNewGame={handleNewGame} />
         </div>
       </div>
 
-      {/* Fixed Footer */}
-      <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto text-center">
+      {/* Fixed Footer - Compact */}
+      <div className="flex-shrink-0 p-2 bg-black bg-opacity-20 backdrop-blur-sm border-t border-white border-opacity-10">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button
             onClick={handleNewGame}
-            className="px-6 py-2 bg-white bg-opacity-20 text-white font-bold rounded-lg
-                       hover:bg-opacity-30 transition-all duration-200 transform hover:scale-105"
+            className="px-4 py-2 bg-white bg-opacity-20 text-white font-bold rounded-lg
+                       hover:bg-opacity-30 transition-all duration-200 transform hover:scale-105 text-sm"
           >
             New Game
           </button>
+          
+          {/* Quick Game Status */}
+          <div className="text-center text-white text-xs">
+            <div>Turn: {gameState.players[gameState.currentPlayerIndex].name}</div>
+            {gameState.drawStack > 0 && (
+              <div className="text-red-300">Penalty: +{gameState.drawStack}</div>
+            )}
+          </div>
+          
+          <div className="text-white text-xs">
+            Selected: {selectedCards.length}/6
+          </div>
         </div>
       </div>
         
@@ -233,6 +254,9 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       {gameState.gamePhase === 'selectingSuit' && (
         <SuitSelector onSelectSuit={handleSelectSuit} />
       )}
+      
+      {/* Game Status Modal */}
+      <GameStatus gameState={gameState} onNewGame={handleNewGame} />
       
       {/* Difficulty Modal */}
       {showDifficultyModal && (
