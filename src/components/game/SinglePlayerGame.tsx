@@ -150,7 +150,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       {/* Main Game Area - Scrollable */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Computer Player - Enhanced Card Backs */}
+          {/* Computer Player - MUCH MORE VISIBLE Card Backs */}
           <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
             <div className="flex items-center justify-between mb-2">
               <h3 className={`font-bold ${isComputerTurn ? 'text-red-400' : 'text-gray-300'}`}>
@@ -170,35 +170,41 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
               </div>
             </div>
             
-            {/* Enhanced Card Backs with Visible Coat of Arms */}
+            {/* DRAMATICALLY ENHANCED Card Backs with VERY VISIBLE Coat of Arms */}
             <div className="flex flex-wrap gap-1">
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-gradient-to-br from-red-800 to-red-900 rounded-lg border-2 border-red-600 flex flex-col items-center justify-center relative overflow-hidden shadow-lg"
+                  className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden shadow-xl"
                 >
-                  {/* Prominent Kenyan Coat of Arms */}
+                  {/* SUPER PROMINENT Kenyan Coat of Arms - Much larger, brighter, and more visible */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <img 
                       src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
                       alt="Kenya Coat of Arms"
-                      className="w-8 h-8 object-contain opacity-80 filter brightness-110"
+                      className="w-10 h-10 object-contain opacity-95"
+                      style={{
+                        filter: 'brightness(1.8) contrast(1.4) saturate(1.6) drop-shadow(0 0 6px rgba(255,255,255,0.4))'
+                      }}
                     />
                   </div>
                   
-                  {/* Decorative border pattern */}
-                  <div className="absolute inset-0 border-2 border-yellow-400 opacity-30 rounded-lg"></div>
+                  {/* Bright golden border frame */}
+                  <div className="absolute inset-0.5 border-2 border-yellow-300 opacity-70 rounded-lg"></div>
                   
-                  {/* Corner decorations */}
-                  <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
-                  <div className="absolute top-0 right-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
-                  <div className="absolute bottom-0 left-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
-                  <div className="absolute bottom-0 right-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
+                  {/* Larger, brighter corner decorations */}
+                  <div className="absolute top-0 left-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-br-lg"></div>
+                  <div className="absolute top-0 right-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-bl-lg"></div>
+                  <div className="absolute bottom-0 left-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-tr-lg"></div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-tl-lg"></div>
                   
-                  {/* "KADI" text at bottom */}
-                  <div className="absolute bottom-0 left-0 right-0 text-center">
-                    <div className="text-yellow-300 text-xs font-bold opacity-70">KADI</div>
+                  {/* "KADI" text at bottom with much better visibility */}
+                  <div className="absolute bottom-0 left-0 right-0 text-center bg-black bg-opacity-40 rounded-b-lg">
+                    <div className="text-yellow-200 text-xs font-bold drop-shadow-lg">KADI</div>
                   </div>
+                  
+                  {/* Additional glow effect */}
+                  <div className="absolute inset-0 bg-yellow-400 opacity-10 rounded-lg animate-pulse"></div>
                 </div>
               ))}
             </div>

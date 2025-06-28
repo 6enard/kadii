@@ -14,40 +14,43 @@ export const GameBoard: React.FC<GameBoardProps> = ({ gameState, onDrawCard }) =
   return (
     <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-4 shadow-2xl border border-red-500">
       <div className="flex items-center justify-between">
-        {/* Draw Pile - Enhanced with Coat of Arms */}
+        {/* Draw Pile - Enhanced with Prominent Coat of Arms */}
         <div className="text-center">
           <div
-            className="w-20 h-28 bg-gradient-to-br from-red-800 to-red-900 rounded-xl border-2 border-red-600 
+            className="w-20 h-28 bg-gradient-to-br from-red-800 to-red-900 rounded-xl border-2 border-yellow-400 
                        cursor-pointer hover:from-red-700 hover:to-red-800 transition-all duration-300
                        flex items-center justify-center shadow-xl transform hover:scale-105 relative overflow-hidden"
             onClick={onDrawCard}
           >
-            {/* Prominent Kenyan coat of arms background */}
+            {/* VERY PROMINENT Kenyan coat of arms - Much larger and brighter */}
             <div className="absolute inset-0 flex items-center justify-center">
               <img 
                 src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
                 alt="Kenya Coat of Arms"
-                className="w-12 h-12 object-contain opacity-60 filter brightness-125"
+                className="w-16 h-16 object-contain opacity-90 filter brightness-150 contrast-125 saturate-150"
+                style={{
+                  filter: 'brightness(1.5) contrast(1.25) saturate(1.5) drop-shadow(0 0 4px rgba(255,255,255,0.3))'
+                }}
               />
             </div>
             
-            {/* Decorative border pattern */}
-            <div className="absolute inset-0 border-2 border-yellow-400 opacity-40 rounded-xl"></div>
+            {/* Bright golden border frame */}
+            <div className="absolute inset-1 border-2 border-yellow-300 opacity-80 rounded-lg"></div>
             
-            {/* Corner decorations */}
-            <div className="absolute top-1 left-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
-            <div className="absolute top-1 right-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
-            <div className="absolute bottom-1 left-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
-            <div className="absolute bottom-1 right-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
+            {/* Corner golden decorations - larger and brighter */}
+            <div className="absolute top-1 left-1 w-4 h-4 bg-yellow-300 opacity-90 rounded-sm"></div>
+            <div className="absolute top-1 right-1 w-4 h-4 bg-yellow-300 opacity-90 rounded-sm"></div>
+            <div className="absolute bottom-1 left-1 w-4 h-4 bg-yellow-300 opacity-90 rounded-sm"></div>
+            <div className="absolute bottom-1 right-1 w-4 h-4 bg-yellow-300 opacity-90 rounded-sm"></div>
             
-            {/* "DRAW" text */}
+            {/* "DRAW" text with better contrast */}
             <div className="absolute bottom-2 left-0 right-0 text-center">
-              <div className="text-yellow-300 font-bold text-xs z-10">DRAW</div>
+              <div className="text-yellow-200 font-bold text-xs z-10 drop-shadow-lg">DRAW</div>
             </div>
             
-            {/* "KADI" text at top */}
+            {/* "KADI" text at top with better contrast */}
             <div className="absolute top-2 left-0 right-0 text-center">
-              <div className="text-yellow-300 font-bold text-xs z-10">KADI</div>
+              <div className="text-yellow-200 font-bold text-xs z-10 drop-shadow-lg">KADI</div>
             </div>
           </div>
           <div className="mt-2 text-white text-sm font-medium">
