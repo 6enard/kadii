@@ -286,7 +286,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
                             {selectedCards.indexOf(card.id) + 1}
                           </span>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
