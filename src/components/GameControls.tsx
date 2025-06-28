@@ -20,12 +20,26 @@ export const GameControls: React.FC<GameControlsProps> = ({
   canPlaySelected
 }) => {
   const currentPlayer = getCurrentPlayer(gameState);
-  const canDeclareNikoKadi = currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled;
   const hasPenalty = gameState.drawStack > 0;
   const isMyTurn = gameState.currentPlayerIndex === 0; // Assuming player 1 is always the human player
   
   return (
     <div className="space-y-4">
+      {/* Dedicated Niko Kadi Button - Always visible */}
+      <div className="flex justify-center">
+        <button
+          onClick={onDeclareNikoKadi}
+          disabled={!isMyTurn}
+          className={`px-12 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 
+                     text-white font-bold text-lg rounded-xl transition-all duration-200 transform hover:scale-105
+                     shadow-xl border-4 border-yellow-300 ring-4 ring-yellow-200
+                     ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'animate-pulse'}
+                     ${currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled ? 'animate-bounce' : ''}`}
+        >
+          🎯 DECLARE "NIKO KADI"! 🎯
+        </button>
+      </div>
+
       {/* Main Controls */}
       <div className="flex flex-wrap gap-3 justify-center p-4 bg-gray-100 rounded-lg">
         {/* Play Cards Button */}
@@ -58,7 +72,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         <div className="flex items-center space-x-4 text-sm text-gray-600">
           <span>Selected: {selectedCards.length}</span>
           {gameState.pendingQuestion && (
-            <span className="text-yellow-600 font-bold">⚠ Question card needs answer!</span>
+            <span className="text-yellow-600 font-bold">⚠ Must answer question immediately!</span>
           )}
           {!isMyTurn && (
             <span className="text-blue-600 font-bold">🤖 Computer's turn</span>
@@ -70,20 +84,6 @@ export const GameControls: React.FC<GameControlsProps> = ({
           )}
         </div>
       </div>
-
-      {/* Dedicated Niko Kadi Button - Always visible when needed */}
-      {canDeclareNikoKadi && isMyTurn && (
-        <div className="flex justify-center">
-          <button
-            onClick={onDeclareNikoKadi}
-            className="px-12 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 
-                       text-white font-bold text-lg rounded-xl transition-all duration-200 transform hover:scale-105
-                       animate-pulse shadow-xl border-4 border-yellow-300 ring-4 ring-yellow-200"
-          >
-            🎯 DECLARE "NIKO KADI"! 🎯
-          </button>
-        </div>
-      )}
     </div>
   );
 };

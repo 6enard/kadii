@@ -72,10 +72,10 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
   
   // If there's a pending question, only the person who played it can answer
   if (gameState.pendingQuestion) {
-    // Can play answer cards or question+answer combo
+    // Can play answer cards or another question card
     if (cards.length === 1) {
       const category = getCardCategory(cards[0].rank);
-      if (category === 'answer') {
+      if (category === 'answer' || category === 'question') {
         return canPlayCard(cards[0], topCard, gameState.selectedSuit);
       }
     }
@@ -165,8 +165,11 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       
     case 'question':
       if (playedCards.length === 1) {
+        // Question card played - same player must answer immediately
         newState.pendingQuestion = true;
-        newState.turnHistory.push(`${currentPlayer.name} played a question card`);
+        newState.turnHistory.push(`${currentPlayer.name} played a question card - must answer immediately`);
+        // Don't change turn - same player continues
+        return newState;
       } else {
         // Question + Answer combo
         newState.pendingQuestion = false;
@@ -216,8 +219,8 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     currentPlayer.nikoKadiCalled = false; // Reset for next declaration
   }
   
-  // Move to next player (unless it's a jump)
-  if (!skipNextTurn) {
+  // Move to next player (unless it's a jump or pending question)
+  if (!skipNextTurn && !newState.pendingQuestion) {
     nextTurn(newState);
   }
   
@@ -291,10 +294,9 @@ export function declareNikoKadi(gameState: GameState): GameState {
   const newState = { ...gameState };
   const currentPlayer = getCurrentPlayer(newState);
   
-  if (currentPlayer.hand.length === 1) {
-    currentPlayer.nikoKadiCalled = true;
-    newState.turnHistory.push(`${currentPlayer.name} declared "Niko Kadi"!`);
-  }
+  // Allow declaring Niko Kadi at any time (not just when having 1 card)
+  currentPlayer.nikoKadiCalled = true;
+  newState.turnHistory.push(`${currentPlayer.name} declared "Niko Kadi"!`);
   
   return newState;
 }
@@ -343,9 +345,28 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
   
   let newState = { ...gameState };
   
-  // Check if AI should declare Niko Kadi
+  // Check if AI should declare Niko Kadi (when having 1 card)
   if (currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled) {
     newState = declareNikoKadi(newState);
+  }
+  
+  // If there's a pending question, AI must answer it or draw
+  if (newState.pendingQuestion) {
+    // Look for answer cards or another question card
+    const answerCards = currentPlayer.hand.filter(card => {
+      const category = getCardCategory(card.rank);
+      return (category === 'answer' || category === 'question') && 
+             canPlayerPlay(newState, [card.id]);
+    });
+    
+    if (answerCards.length > 0) {
+      // Play an answer or question card
+      const selectedCard = answerCards[0];
+      return playCards(newState, { cardIds: [selectedCard.id] });
+    } else {
+      // No answer available, must draw
+      return drawCard(newState, newState.currentPlayerIndex);
+    }
   }
   
   // Find playable cards
