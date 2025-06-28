@@ -1,7 +1,6 @@
 import React from 'react';
 import { GameState } from '../types';
 import { getCurrentPlayer } from '../utils/gameLogic';
-import { Play, Zap, Target } from 'lucide-react';
 
 interface GameControlsProps {
   gameState: GameState;
@@ -22,119 +21,70 @@ export const GameControls: React.FC<GameControlsProps> = ({
 }) => {
   const currentPlayer = getCurrentPlayer(gameState);
   const hasPenalty = gameState.drawStack > 0;
-  const isMyTurn = gameState.currentPlayerIndex === 0;
-  
-  // Get card names for display
-  const getSelectedCardNames = () => {
-    if (selectedCards.length === 0) return '';
-    
-    const cards = selectedCards.map(id => 
-      currentPlayer.hand.find(c => c.id === id)
-    ).filter(Boolean);
-    
-    if (cards.length === 1) {
-      return `${cards[0]!.rank}${cards[0]!.suit}`;
-    }
-    
-    // Group by rank for better display
-    const rankGroups = new Map<string, number>();
-    cards.forEach(card => {
-      if (card) {
-        rankGroups.set(card.rank, (rankGroups.get(card.rank) || 0) + 1);
-      }
-    });
-    
-    const groupStrings = Array.from(rankGroups.entries()).map(([rank, count]) => 
-      count > 1 ? `${count}×${rank}` : rank
-    );
-    
-    return groupStrings.join(', ');
-  };
+  const isMyTurn = gameState.currentPlayerIndex === 0; // Assuming player 1 is always the human player
   
   return (
     <div className="space-y-4">
-      {/* Dedicated Niko Kadi Button */}
-      <div className="text-center">
+      {/* Dedicated Niko Kadi Button - Always visible */}
+      <div className="flex justify-center">
         <button
           onClick={onDeclareNikoKadi}
           disabled={!isMyTurn}
-          className={`
-            px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400
-            text-black font-bold text-lg rounded-xl transition-all duration-200 transform hover:scale-105
-            shadow-2xl border-2 border-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed
-            ${isMyTurn ? 'animate-pulse shadow-yellow-500/50' : ''}
-            ${currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled ? 'animate-bounce' : ''}
-          `}
+          className={`px-12 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 
+                     text-white font-bold text-lg rounded-xl transition-all duration-200 transform hover:scale-105
+                     shadow-xl border-4 border-yellow-300 ring-4 ring-yellow-200
+                     ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'animate-pulse'}
+                     ${currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled ? 'animate-bounce' : ''}`}
         >
-          <Target className="inline mr-2" size={20} />
-          NIKO KADI
+          🎯 DECLARE "NIKO KADI"! 🎯
         </button>
       </div>
 
       {/* Main Controls */}
-      <div className="space-y-3">
+      <div className="flex flex-wrap gap-3 justify-center p-4 bg-gray-100 rounded-lg">
         {/* Play Cards Button */}
         <button
           onClick={onPlayCards}
           disabled={!canPlaySelected || selectedCards.length === 0 || !isMyTurn}
           className={`
-            w-full p-4 rounded-xl font-bold transition-all duration-200 transform hover:scale-105
+            px-6 py-3 rounded-lg font-bold text-white transition-all duration-200
             ${canPlaySelected && selectedCards.length > 0 && isMyTurn
-              ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white shadow-lg shadow-green-500/30' 
-              : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+              ? 'bg-green-500 hover:bg-green-600 transform hover:scale-105' 
+              : 'bg-gray-400 cursor-not-allowed'
             }
           `}
         >
-          <div className="flex items-center justify-center space-x-2">
-            <Play size={20} />
-            <div>
-              {selectedCards.length > 0 ? (
-                <>
-                  <div>PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}</div>
-                  <div className="text-xs opacity-90">({getSelectedCardNames()})</div>
-                </>
-              ) : (
-                <div>SELECT CARDS</div>
-              )}
-            </div>
-          </div>
+          Play {selectedCards.length > 0 ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}` : 'Cards'}
         </button>
         
         {/* Draw Penalty Button */}
         {hasPenalty && isMyTurn && (
           <button
             onClick={onDrawPenalty}
-            className="w-full p-4 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 
-                       text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105
-                       shadow-lg shadow-red-500/30"
+            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold 
+                       rounded-lg transition-all duration-200 transform hover:scale-105"
           >
-            <div className="flex items-center justify-center space-x-2">
-              <Zap size={20} />
-              <span>DRAW {gameState.drawStack} PENALTY</span>
-            </div>
+            Draw {gameState.drawStack} Penalty Cards
           </button>
         )}
-      </div>
-      
-      {/* Status Indicators */}
-      <div className="space-y-2 text-center text-sm">
-        {gameState.pendingQuestion && (
-          <div className="bg-red-500/20 border border-red-500/50 px-3 py-2 rounded-lg text-red-300 animate-pulse">
-            🚨 ANSWER REQUIRED
-          </div>
-        )}
         
-        {!isMyTurn && (
-          <div className="bg-blue-500/20 border border-blue-500/50 px-3 py-2 rounded-lg text-blue-300">
-            🤖 OPPONENT'S TURN
-          </div>
-        )}
-        
-        {selectedCards.length > 1 && (
-          <div className="bg-cyan-500/20 border border-cyan-500/50 px-3 py-2 rounded-lg text-cyan-300">
-            🃏 STACKING: {getSelectedCardNames()}
-          </div>
-        )}
+        {/* Game Status Info */}
+        <div className="flex items-center space-x-4 text-sm text-gray-600">
+          <span>Selected: {selectedCards.length}</span>
+          {gameState.pendingQuestion && (
+            <span className="text-red-600 font-bold animate-pulse">
+              🚨 QUESTION MUST BE ANSWERED! 🚨
+            </span>
+          )}
+          {!isMyTurn && (
+            <span className="text-blue-600 font-bold">🤖 Computer's turn</span>
+          )}
+          {hasPenalty && (
+            <span className="text-red-600 font-bold">
+              ⚡ Penalty: {gameState.drawStack} cards - Counter with 2, 3, or A!
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
