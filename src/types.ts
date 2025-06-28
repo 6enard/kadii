@@ -8,6 +8,7 @@ export interface Card {
 }
 
 export type CardCategory = 'penalty' | 'jump' | 'kickback' | 'question' | 'answer' | 'wild';
+export type AIDifficulty = 'easy' | 'medium' | 'hard';
 
 export interface Player {
   id: string;
@@ -27,6 +28,7 @@ export interface GameState {
   gamePhase: 'setup' | 'playing' | 'selectingSuit' | 'gameOver';
   winner: string | null;
   turnHistory: string[];
+  aiDifficulty?: AIDifficulty;
 }
 
 export interface PlayCardOptions {

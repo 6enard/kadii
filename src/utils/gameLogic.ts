@@ -212,6 +212,9 @@ export function drawCard(gameState: GameState, playerIndex: number): GameState {
     newState.players[playerIndex].hand.push(drawnCard);
   }
   
+  // Clear pending question when a card is drawn
+  newState.pendingQuestion = false;
+  
   // After drawing a card, turn goes to next player
   nextTurn(newState);
   
@@ -293,4 +296,158 @@ function nextTurn(gameState: GameState): void {
     
     gameState.turnHistory.push(`${currentPlayer.name} forgot to declare "Niko Kadi" and drew a card`);
   }
+}
+
+// AI Computer Logic
+export type AIDifficulty = 'easy' | 'medium' | 'hard';
+
+export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): GameState {
+  const currentPlayer = getCurrentPlayer(gameState);
+  if (currentPlayer.name !== 'Computer') return gameState;
+  
+  let newState = { ...gameState };
+  
+  // Check if AI should declare Niko Kadi
+  if (currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled) {
+    newState = declareNikoKadi(newState);
+  }
+  
+  // Find playable cards
+  const playableCards = currentPlayer.hand.filter(card => 
+    canPlayerPlay(newState, [card.id])
+  );
+  
+  if (playableCards.length === 0) {
+    // No playable cards, must draw
+    if (newState.drawStack > 0) {
+      return handlePenaltyDraw(newState);
+    } else {
+      return drawCard(newState, newState.currentPlayerIndex);
+    }
+  }
+  
+  // AI strategy based on difficulty
+  let selectedCard: Card;
+  
+  switch (difficulty) {
+    case 'easy':
+      // Easy: Play first available card
+      selectedCard = playableCards[0];
+      break;
+      
+    case 'medium':
+      // Medium: Prefer special cards, avoid giving opponent advantages
+      selectedCard = selectMediumAICard(playableCards, newState);
+      break;
+      
+    case 'hard':
+      // Hard: Strategic play, consider opponent's hand size and game state
+      selectedCard = selectHardAICard(playableCards, newState);
+      break;
+      
+    default:
+      selectedCard = playableCards[0];
+  }
+  
+  // Check for multiple cards of same rank
+  const sameRankCards = currentPlayer.hand.filter(card => 
+    card.rank === selectedCard.rank && canPlayerPlay(newState, [card.id])
+  );
+  
+  const cardsToPlay = difficulty === 'hard' && sameRankCards.length > 1 
+    ? sameRankCards.slice(0, Math.min(3, sameRankCards.length)) // Play up to 3 of same rank
+    : [selectedCard];
+  
+  // Handle Ace (wild card) suit selection
+  if (selectedCard.rank === 'A') {
+    const bestSuit = selectBestSuit(currentPlayer.hand, difficulty);
+    return playCards(newState, { 
+      cardIds: cardsToPlay.map(c => c.id), 
+      declaredSuit: bestSuit 
+    });
+  }
+  
+  return playCards(newState, { cardIds: cardsToPlay.map(c => c.id) });
+}
+
+function selectMediumAICard(playableCards: Card[], gameState: GameState): Card {
+  // Prefer special cards that benefit AI
+  const specialCards = playableCards.filter(card => {
+    const category = getCardCategory(card.rank);
+    return ['penalty', 'jump', 'wild'].includes(category);
+  });
+  
+  if (specialCards.length > 0) {
+    return specialCards[0];
+  }
+  
+  // Otherwise play highest value card
+  const cardValues = { 'A': 14, 'K': 13, 'Q': 12, 'J': 11, '10': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2 };
+  return playableCards.sort((a, b) => (cardValues[b.rank] || 0) - (cardValues[a.rank] || 0))[0];
+}
+
+function selectHardAICard(playableCards: Card[], gameState: GameState): Card {
+  const opponent = gameState.players.find(p => p.name !== 'Computer')!;
+  const opponentHandSize = opponent.hand.length;
+  
+  // If opponent has few cards, prioritize defensive play
+  if (opponentHandSize <= 2) {
+    // Prefer penalty cards to slow opponent down
+    const penaltyCards = playableCards.filter(card => 
+      getCardCategory(card.rank) === 'penalty'
+    );
+    if (penaltyCards.length > 0) {
+      return penaltyCards[0];
+    }
+  }
+  
+  // If AI has many cards, prioritize getting rid of cards quickly
+  const currentPlayer = getCurrentPlayer(gameState);
+  if (currentPlayer.hand.length > 5) {
+    // Look for cards with same rank to play multiple
+    const rankCounts = new Map<string, Card[]>();
+    playableCards.forEach(card => {
+      if (!rankCounts.has(card.rank)) {
+        rankCounts.set(card.rank, []);
+      }
+      rankCounts.get(card.rank)!.push(card);
+    });
+    
+    // Find rank with most cards
+    let bestRank = '';
+    let maxCount = 0;
+    rankCounts.forEach((cards, rank) => {
+      if (cards.length > maxCount) {
+        maxCount = cards.length;
+        bestRank = rank;
+      }
+    });
+    
+    if (maxCount > 1) {
+      return rankCounts.get(bestRank)![0];
+    }
+  }
+  
+  // Default to medium strategy
+  return selectMediumAICard(playableCards, gameState);
+}
+
+function selectBestSuit(hand: Card[], difficulty: AIDifficulty): string {
+  const suitCounts = { hearts: 0, diamonds: 0, clubs: 0, spades: 0 };
+  
+  hand.forEach(card => {
+    suitCounts[card.suit]++;
+  });
+  
+  // For hard difficulty, consider strategic suit selection
+  if (difficulty === 'hard') {
+    // Prefer suit with most cards, but also consider special cards
+    const suits = Object.entries(suitCounts);
+    suits.sort((a, b) => b[1] - a[1]);
+    return suits[0][0];
+  }
+  
+  // For easy/medium, just pick most common suit
+  return Object.entries(suitCounts)
+    .sort((a, b) => b[1] - a[1])[0][0];
 }
