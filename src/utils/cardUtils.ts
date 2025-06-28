@@ -68,7 +68,7 @@ export function getPenaltyValue(rank: Rank): number {
 }
 
 export function canPlayCard(card: Card, topCard: Card, selectedSuit: Suit | null): boolean {
-  // Wild cards can always be played
+  // Wild cards (Aces) can always be played
   if (card.rank === 'A') return true;
   
   // If there's a selected suit from a previous Ace, match that
@@ -112,4 +112,24 @@ export function isValidQuestionAnswerCombo(cards: Card[]): boolean {
   
   // The answer card must be valid to play (this will be checked in canPlayerPlay)
   return true;
+}
+
+// CRITICAL: Aces can answer questions too!
+export function canAnswerQuestion(card: Card, topCard: Card, selectedSuit: Suit | null): boolean {
+  const category = getCardCategory(card.rank);
+  
+  // Aces can answer questions (wild cards)
+  if (card.rank === 'A') return true;
+  
+  // Regular answer cards
+  if (category === 'answer') {
+    return canPlayCard(card, topCard, selectedSuit);
+  }
+  
+  // Question cards can also answer questions
+  if (category === 'question') {
+    return canPlayCard(card, topCard, selectedSuit);
+  }
+  
+  return false;
 }

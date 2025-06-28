@@ -10,9 +10,12 @@ export const SuitSelector: React.FC<SuitSelectorProps> = ({ onSelectSuit }) => {
   const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-xl">
-        <h3 className="text-xl font-bold mb-6 text-center">Select a Suit</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+        <div className="text-center mb-6">
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">Choose a Suit</h3>
+          <p className="text-gray-600">Select the suit for your Ace (wild card)</p>
+        </div>
         
         <div className="grid grid-cols-2 gap-4">
           {suits.map((suit) => (
@@ -20,15 +23,22 @@ export const SuitSelector: React.FC<SuitSelectorProps> = ({ onSelectSuit }) => {
               key={suit}
               onClick={() => onSelectSuit(suit)}
               className={`
-                w-24 h-24 rounded-lg border-2 flex flex-col items-center justify-center
-                hover:bg-gray-50 transition-all duration-200 transform hover:scale-105
-                ${SUIT_COLORS[suit]} border-gray-300 hover:border-gray-400
+                w-full h-24 rounded-xl border-2 flex flex-col items-center justify-center
+                hover:bg-gray-50 transition-all duration-300 transform hover:scale-105
+                ${SUIT_COLORS[suit]} border-gray-300 hover:border-gray-400 shadow-lg hover:shadow-xl
+                bg-gradient-to-br from-white to-gray-50
               `}
             >
-              <div className="text-3xl mb-1">{SUIT_SYMBOLS[suit]}</div>
-              <div className="text-sm font-medium capitalize">{suit}</div>
+              <div className="text-4xl mb-1">{SUIT_SYMBOLS[suit]}</div>
+              <div className="text-sm font-bold capitalize">{suit}</div>
             </button>
           ))}
+        </div>
+        
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-500">
+            🎯 Ace cards can answer questions and counter penalties!
+          </p>
         </div>
       </div>
     </div>

@@ -7,7 +7,8 @@ import {
   isValidStartingCard,
   canWinWithCards,
   isValidQuestionAnswerCombo,
-  shuffleDeck
+  shuffleDeck,
+  canAnswerQuestion
 } from './cardUtils';
 
 export function initializeGame(): GameState {
@@ -70,14 +71,11 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
     });
   }
   
-  // If there's a pending question, only the person who played it can answer
+  // CRITICAL: If there's a pending question, only the person who played it can answer
   if (gameState.pendingQuestion) {
-    // Can play answer cards or another question card
+    // Can play answer cards, question cards, or ACES (wild cards can answer questions!)
     if (cards.length === 1) {
-      const category = getCardCategory(cards[0].rank);
-      if (category === 'answer' || category === 'question') {
-        return canPlayCard(cards[0], topCard, gameState.selectedSuit);
-      }
+      return canAnswerQuestion(cards[0], topCard, gameState.selectedSuit);
     }
     
     // Question + Answer combo
@@ -156,10 +154,14 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
         newState.gamePhase = 'selectingSuit';
         return newState;
       }
-      // Wild cancels any pending penalty
+      // Wild cancels any pending penalty AND answers questions!
       if (newState.drawStack > 0) {
         newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace`);
         newState.drawStack = 0;
+      }
+      if (newState.pendingQuestion) {
+        newState.pendingQuestion = false;
+        newState.turnHistory.push(`${currentPlayer.name} answered question with Ace (wild card)`);
       }
       break;
       
@@ -365,16 +367,25 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
   
   // CRITICAL: If there's a pending question, AI must answer it or draw
   if (newState.pendingQuestion) {
-    // Look for answer cards or another question card
-    const answerCards = currentPlayer.hand.filter(card => {
-      const category = getCardCategory(card.rank);
-      return (category === 'answer' || category === 'question') && 
-             canPlayerPlay(newState, [card.id]);
-    });
+    // Look for answer cards, question cards, or ACES (wild cards can answer!)
+    const answerCards = currentPlayer.hand.filter(card => 
+      canAnswerQuestion(card, getTopCard(newState), newState.selectedSuit)
+    );
     
     if (answerCards.length > 0) {
-      // Play an answer or question card
-      const selectedCard = answerCards[0];
+      // Prefer Aces (wild cards) if available
+      const aceCards = answerCards.filter(card => card.rank === 'A');
+      const selectedCard = aceCards.length > 0 ? aceCards[0] : answerCards[0];
+      
+      // Handle Ace suit selection
+      if (selectedCard.rank === 'A') {
+        const bestSuit = selectBestSuit(currentPlayer.hand, difficulty);
+        return playCards(newState, { 
+          cardIds: [selectedCard.id], 
+          declaredSuit: bestSuit 
+        });
+      }
+      
       return playCards(newState, { cardIds: [selectedCard.id] });
     } else {
       // No answer available, must draw - this will clear the question and continue normally
