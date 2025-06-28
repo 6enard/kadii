@@ -18,6 +18,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setUsername('');
+    setError('');
+    setShowPassword(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -40,12 +48,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           friends: []
         });
       }
+      
+      // Reset form and close modal on success
+      resetForm();
       onClose();
     } catch (error: any) {
       setError(error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleToggleMode = () => {
+    setIsLogin(!isLogin);
+    setError('');
   };
 
   if (!isOpen) return null;
@@ -55,7 +76,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-6 text-white relative">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute top-4 right-4 p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
           >
             <X size={20} />
@@ -131,7 +152,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <div className="text-center">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={handleToggleMode}
               className="text-emerald-600 hover:text-emerald-700 font-medium"
             >
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}

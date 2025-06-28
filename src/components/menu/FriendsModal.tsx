@@ -62,23 +62,67 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
     setLoading(true);
     try {
       const usersRef = collection(db, 'users');
-      const q = query(
+      
+      // Search by username (case-insensitive)
+      const usernameQuery = query(
         usersRef,
-        where('username', '>=', searchQuery),
-        where('username', '<=', searchQuery + '\uf8ff')
+        where('username', '>=', searchQuery.toLowerCase()),
+        where('username', '<=', searchQuery.toLowerCase() + '\uf8ff')
       );
       
-      const querySnapshot = await getDocs(q);
-      const results: UserData[] = [];
+      // Also search by exact match (case-sensitive)
+      const exactQuery = query(
+        usersRef,
+        where('username', '==', searchQuery)
+      );
       
-      querySnapshot.forEach((doc) => {
-        if (doc.id !== user.uid) {
+      const [usernameSnapshot, exactSnapshot] = await Promise.all([
+        getDocs(usernameQuery),
+        getDocs(exactQuery)
+      ]);
+      
+      const results: UserData[] = [];
+      const seenIds = new Set<string>();
+      
+      // Process exact matches first
+      exactSnapshot.forEach((doc) => {
+        if (doc.id !== user.uid && !seenIds.has(doc.id)) {
           results.push({
             id: doc.id,
             ...doc.data()
           } as UserData);
+          seenIds.add(doc.id);
         }
       });
+      
+      // Then process partial matches
+      usernameSnapshot.forEach((doc) => {
+        if (doc.id !== user.uid && !seenIds.has(doc.id)) {
+          results.push({
+            id: doc.id,
+            ...doc.data()
+          } as UserData);
+          seenIds.add(doc.id);
+        }
+      });
+      
+      // If no results, try searching all users and filter client-side
+      if (results.length === 0) {
+        const allUsersQuery = query(usersRef);
+        const allUsersSnapshot = await getDocs(allUsersQuery);
+        
+        allUsersSnapshot.forEach((doc) => {
+          const userData = doc.data() as UserData;
+          if (doc.id !== user.uid && 
+              userData.username && 
+              userData.username.toLowerCase().includes(searchQuery.toLowerCase())) {
+            results.push({
+              id: doc.id,
+              ...userData
+            });
+          }
+        });
+      }
       
       setSearchResults(results);
     } catch (error) {
@@ -115,6 +159,12 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
 
   const isFriend = (userId: string) => {
     return friends.some(friend => friend.id === userId);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      searchUsers();
+    }
   };
 
   if (!isOpen) return null;
@@ -170,7 +220,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                     placeholder="Search by username..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && searchUsers()}
+                    onKeyPress={handleKeyPress}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
@@ -193,7 +243,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                       <div>
                         <h4 className="font-semibold text-gray-800">{user.username}</h4>
                         <p className="text-sm text-gray-600">
-                          {user.gamesWon}/{user.gamesPlayed} games won
+                          {user.gamesWon || 0}/{user.gamesPlayed || 0} games won
                         </p>
                       </div>
                     </div>
@@ -206,11 +256,22 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                         <span>Add Friend</span>
                       </button>
                     )}
+                    {isFriend(user.id) && (
+                      <span className="text-green-600 font-medium">✓ Friends</span>
+                    )}
                   </div>
                 ))}
                 {searchResults.length === 0 && searchQuery && !loading && (
                   <div className="text-center py-8 text-gray-500">
-                    No users found with username "{searchQuery}"
+                    <Users size={48} className="mx-auto mb-4 text-gray-300" />
+                    <p>No users found with username "{searchQuery}"</p>
+                    <p className="text-sm mt-2">Try searching with the exact username</p>
+                  </div>
+                )}
+                {!searchQuery && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Search size={48} className="mx-auto mb-4 text-gray-300" />
+                    <p>Enter a username to search for friends</p>
                   </div>
                 )}
               </div>
@@ -228,7 +289,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                     <div>
                       <h4 className="font-semibold text-gray-800">{friend.username}</h4>
                       <p className="text-sm text-gray-600">
-                        {friend.gamesWon}/{friend.gamesPlayed} games won
+                        {friend.gamesWon || 0}/{friend.gamesPlayed || 0} games won
                       </p>
                     </div>
                   </div>
