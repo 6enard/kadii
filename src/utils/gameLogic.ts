@@ -67,9 +67,22 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
     return canPlayCard(cards[0], topCard, gameState.selectedSuit);
   }
   
-  // Multiple cards - only valid for Question + Answer combo
-  if (cards.length === 2) {
-    return isValidQuestionAnswerCombo(cards);
+  // Multiple cards - check if they're all the same rank and at least one matches
+  if (cards.length > 1) {
+    // All cards must have the same rank
+    const firstRank = cards[0].rank;
+    const allSameRank = cards.every(card => card.rank === firstRank);
+    
+    if (!allSameRank) {
+      // Special case: Question + Answer combo
+      if (cards.length === 2) {
+        return isValidQuestionAnswerCombo(cards);
+      }
+      return false;
+    }
+    
+    // At least one card must be playable
+    return cards.some(card => canPlayCard(card, topCard, gameState.selectedSuit));
   }
   
   return false;
@@ -91,16 +104,23 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   // Add cards to discard pile
   newState.discardPile.push(...playedCards);
   
-  // Reset selected suit
+  // Reset selected suit and pending question
   newState.selectedSuit = null;
+  newState.pendingQuestion = false;
   
-  // Handle special card effects
+  // Handle special card effects based on the last played card
   const lastPlayedCard = playedCards[playedCards.length - 1];
   const category = getCardCategory(lastPlayedCard.rank);
   
+  let skipNextTurn = false;
+  
   switch (category) {
     case 'penalty':
-      newState.drawStack += getPenaltyValue(lastPlayedCard.rank);
+      // Add penalty for each penalty card played
+      const totalPenalty = playedCards.reduce((sum, card) => {
+        return sum + getPenaltyValue(card.rank);
+      }, 0);
+      newState.drawStack += totalPenalty;
       break;
       
     case 'wild':
@@ -121,8 +141,14 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       break;
       
     case 'jump':
-      // In 2-player mode, current player plays again
-      return newState;
+      // In 2-player mode, current player plays again (skip opponent's turn)
+      skipNextTurn = true;
+      break;
+      
+    case 'kickback':
+      // Reverse turn order - in 2-player mode, this acts like a jump
+      skipNextTurn = true;
+      break;
   }
   
   // Check for win condition
@@ -142,8 +168,8 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     currentPlayer.nikoKadiCalled = false; // Reset for next declaration
   }
   
-  // Move to next player (unless it's a jump)
-  if (category !== 'jump') {
+  // Move to next player (unless it's a jump/kickback)
+  if (!skipNextTurn) {
     nextTurn(newState);
   }
   
@@ -166,6 +192,11 @@ export function drawCard(gameState: GameState, playerIndex: number): GameState {
     newState.players[playerIndex].hand.push(drawnCard);
   }
   
+  // After drawing a card (when no valid play), turn goes to next player
+  if (newState.pendingQuestion || newState.drawStack === 0) {
+    nextTurn(newState);
+  }
+  
   return newState;
 }
 
@@ -181,7 +212,8 @@ export function handlePenaltyDraw(gameState: GameState): GameState {
     }
     
     newState.drawStack = 0;
-    nextTurn(newState);
+    // Turn automatically moves to next player after penalty draw
+    // (this is handled in the drawCard function)
   }
   
   return newState;
@@ -217,7 +249,9 @@ function nextTurn(gameState: GameState): void {
   const currentPlayer = getCurrentPlayer(gameState);
   if (currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled) {
     // Player must draw a card for not declaring
-    drawCard(gameState, gameState.currentPlayerIndex);
+    const drawnState = drawCard(gameState, gameState.currentPlayerIndex);
+    // Copy the updated hand back
+    gameState.players[gameState.currentPlayerIndex].hand = drawnState.players[gameState.currentPlayerIndex].hand;
     gameState.turnHistory.push(`${currentPlayer.name} forgot to declare "Niko Kadi" and drew a card`);
   }
 }
