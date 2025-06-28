@@ -18,7 +18,6 @@ export const Card: React.FC<CardProps> = ({
   size = 'medium'
 }) => {
   const category = getCardCategory(card.rank);
-  const suitColor = SUIT_COLORS[card.suit];
   
   const sizeClasses = {
     small: 'w-12 h-16 text-xs',
@@ -28,12 +27,12 @@ export const Card: React.FC<CardProps> = ({
   
   const getCategoryGradient = () => {
     switch (category) {
-      case 'penalty': return 'bg-gradient-to-br from-red-200 to-red-300 border-red-500 shadow-red-300';
-      case 'jump': return 'bg-gradient-to-br from-red-300 to-red-400 border-red-600 shadow-red-400';
-      case 'kickback': return 'bg-gradient-to-br from-red-400 to-red-500 border-red-700 shadow-red-500';
-      case 'question': return 'bg-gradient-to-br from-red-500 to-red-600 border-red-800 shadow-red-600';
-      case 'wild': return 'bg-gradient-to-br from-red-600 to-red-700 border-red-900 shadow-red-700';
-      default: return 'bg-gradient-to-br from-red-100 to-red-200 border-red-400 shadow-red-300';
+      case 'penalty': return 'bg-gradient-to-br from-white to-red-50 border-red-400 shadow-red-200';
+      case 'jump': return 'bg-gradient-to-br from-white to-red-50 border-red-500 shadow-red-300';
+      case 'kickback': return 'bg-gradient-to-br from-white to-red-50 border-red-600 shadow-red-400';
+      case 'question': return 'bg-gradient-to-br from-white to-red-50 border-red-700 shadow-red-500';
+      case 'wild': return 'bg-gradient-to-br from-white to-red-50 border-red-800 shadow-red-600';
+      default: return 'bg-gradient-to-br from-white to-gray-50 border-red-300 shadow-red-200';
     }
   };
   
@@ -52,14 +51,14 @@ export const Card: React.FC<CardProps> = ({
       onClick={onClick}
     >
       {/* Top corner */}
-      <div className="font-bold text-white text-center leading-tight drop-shadow-lg">
-        <div className="font-black text-shadow">{card.rank}</div>
-        <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
+      <div className="font-bold text-red-600 text-center leading-tight drop-shadow-sm">
+        <div className="font-black text-shadow-red">{card.rank}</div>
+        <div className="text-lg text-red-500">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Center - Kenyan Coat of Arms */}
       <div className="flex-1 flex items-center justify-center relative">
-        <div className="absolute inset-0 flex items-center justify-center opacity-20">
+        <div className="absolute inset-0 flex items-center justify-center opacity-15">
           <img 
             src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
             alt="Kenya Coat of Arms"
@@ -68,15 +67,15 @@ export const Card: React.FC<CardProps> = ({
         </div>
         
         {/* Main suit symbol */}
-        <div className="text-white text-2xl font-bold z-10 drop-shadow-lg">
+        <div className="text-red-500 text-2xl font-bold z-10 drop-shadow-sm">
           {SUIT_SYMBOLS[card.suit]}
         </div>
       </div>
       
       {/* Bottom corner (rotated) */}
-      <div className="font-bold text-white rotate-180 text-center leading-tight drop-shadow-lg">
-        <div className="font-black text-shadow">{card.rank}</div>
-        <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
+      <div className="font-bold text-red-600 rotate-180 text-center leading-tight drop-shadow-sm">
+        <div className="font-black text-shadow-red">{card.rank}</div>
+        <div className="text-lg text-red-500">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Special card indicator */}
@@ -91,8 +90,8 @@ export const Card: React.FC<CardProps> = ({
       
       {/* Enhanced text shadow for better readability */}
       <style jsx>{`
-        .text-shadow {
-          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        .text-shadow-red {
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
         }
       `}</style>
     </div>
