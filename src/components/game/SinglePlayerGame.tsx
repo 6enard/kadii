@@ -150,7 +150,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       {/* Main Game Area - Scrollable */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Computer Player - Compact */}
+          {/* Computer Player - Enhanced Card Backs */}
           <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
             <div className="flex items-center justify-between mb-2">
               <h3 className={`font-bold ${isComputerTurn ? 'text-blue-400' : 'text-gray-300'}`}>
@@ -170,26 +170,47 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
               </div>
             </div>
             
-            {/* Hidden cards - Compact */}
+            {/* Enhanced Card Backs with Visible Coat of Arms */}
             <div className="flex flex-wrap gap-1">
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-blue-900 rounded-lg border border-blue-700 flex items-center justify-center"
+                  className="w-12 h-16 bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-lg border-2 border-emerald-600 flex flex-col items-center justify-center relative overflow-hidden shadow-lg"
                 >
-                  <div className="text-white text-xs font-bold">K</div>
+                  {/* Prominent Kenyan Coat of Arms */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <img 
+                      src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
+                      alt="Kenya Coat of Arms"
+                      className="w-8 h-8 object-contain opacity-80 filter brightness-110"
+                    />
+                  </div>
+                  
+                  {/* Decorative border pattern */}
+                  <div className="absolute inset-0 border-2 border-yellow-400 opacity-30 rounded-lg"></div>
+                  
+                  {/* Corner decorations */}
+                  <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
+                  <div className="absolute top-0 right-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
+                  <div className="absolute bottom-0 left-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
+                  <div className="absolute bottom-0 right-0 w-2 h-2 bg-yellow-400 opacity-50"></div>
+                  
+                  {/* "KADI" text at bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 text-center">
+                    <div className="text-yellow-300 text-xs font-bold opacity-70">KADI</div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
           
-          {/* Game Board - Compact */}
+          {/* Game Board */}
           <GameBoard
             gameState={gameState}
             onDrawCard={handleDrawCard}
           />
           
-          {/* Game Controls - Always visible */}
+          {/* Game Controls */}
           <GameControls
             gameState={gameState}
             selectedCards={selectedCards}
@@ -209,7 +230,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
             isMyTurn={!isComputerTurn}
           />
           
-          {/* Game Status - Compact */}
+          {/* Game Status */}
           <GameStatus gameState={gameState} onNewGame={handleNewGame} />
         </div>
       </div>

@@ -14,23 +14,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({ gameState, onDrawCard }) =
   return (
     <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-4 shadow-2xl border border-green-500">
       <div className="flex items-center justify-between">
-        {/* Draw Pile */}
+        {/* Draw Pile - Enhanced with Coat of Arms */}
         <div className="text-center">
           <div
-            className="w-20 h-28 bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl border-2 border-blue-700 
-                       cursor-pointer hover:from-blue-800 hover:to-blue-700 transition-all duration-300
+            className="w-20 h-28 bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-xl border-2 border-emerald-600 
+                       cursor-pointer hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300
                        flex items-center justify-center shadow-xl transform hover:scale-105 relative overflow-hidden"
             onClick={onDrawCard}
           >
-            {/* Kenyan coat of arms background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-10">
+            {/* Prominent Kenyan coat of arms background */}
+            <div className="absolute inset-0 flex items-center justify-center">
               <img 
                 src="/src/assets/Coat_of_arms_of_Kenya_(Official).svg.png" 
                 alt="Kenya Coat of Arms"
-                className="w-12 h-12 object-contain"
+                className="w-12 h-12 object-contain opacity-60 filter brightness-125"
               />
             </div>
-            <div className="text-white font-bold text-sm z-10">DRAW</div>
+            
+            {/* Decorative border pattern */}
+            <div className="absolute inset-0 border-2 border-yellow-400 opacity-40 rounded-xl"></div>
+            
+            {/* Corner decorations */}
+            <div className="absolute top-1 left-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
+            <div className="absolute top-1 right-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
+            <div className="absolute bottom-1 left-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
+            <div className="absolute bottom-1 right-1 w-3 h-3 bg-yellow-400 opacity-60 rounded-sm"></div>
+            
+            {/* "DRAW" text */}
+            <div className="absolute bottom-2 left-0 right-0 text-center">
+              <div className="text-yellow-300 font-bold text-xs z-10">DRAW</div>
+            </div>
+            
+            {/* "KADI" text at top */}
+            <div className="absolute top-2 left-0 right-0 text-center">
+              <div className="text-yellow-300 font-bold text-xs z-10">KADI</div>
+            </div>
           </div>
           <div className="mt-2 text-white text-sm font-medium">
             {gameState.drawPile.length} cards
