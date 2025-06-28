@@ -2,7 +2,11 @@
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'happy-monkey': ['Happy Monkey', 'cursive'],
+      },
+    },
   },
   plugins: [],
 };

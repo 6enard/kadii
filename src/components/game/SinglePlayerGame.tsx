@@ -120,26 +120,26 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     .map(card => card.id) : [];
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-red-800 flex flex-col">
       {/* Fixed Header */}
       <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <button
             onClick={onBackToMenu}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-red-200 transition-colors"
           >
             <ArrowLeft size={20} />
             <span>Back</span>
           </button>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">Kadi vs Computer</h1>
-            <p className="text-emerald-200 text-sm">
+            <p className="text-red-200 text-sm">
               Difficulty: <span className="capitalize font-semibold">{gameState.aiDifficulty}</span>
             </p>
           </div>
           <button
             onClick={() => setShowDifficultyModal(true)}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-red-200 transition-colors"
           >
             <Settings size={20} />
             <span>Settings</span>
@@ -153,9 +153,9 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
           {/* Computer Player - Enhanced Card Backs */}
           <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
             <div className="flex items-center justify-between mb-2">
-              <h3 className={`font-bold ${isComputerTurn ? 'text-blue-400' : 'text-gray-300'}`}>
+              <h3 className={`font-bold ${isComputerTurn ? 'text-red-400' : 'text-gray-300'}`}>
                 🤖 Computer
-                {isComputerTurn && <span className="ml-2 text-xs bg-blue-600 px-2 py-1 rounded animate-pulse">Thinking...</span>}
+                {isComputerTurn && <span className="ml-2 text-xs bg-red-600 px-2 py-1 rounded animate-pulse">Thinking...</span>}
               </h3>
               
               <div className="flex items-center space-x-2 text-sm">
@@ -175,7 +175,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-lg border-2 border-emerald-600 flex flex-col items-center justify-center relative overflow-hidden shadow-lg"
+                  className="w-12 h-16 bg-gradient-to-br from-red-800 to-red-900 rounded-lg border-2 border-red-600 flex flex-col items-center justify-center relative overflow-hidden shadow-lg"
                 >
                   {/* Prominent Kenyan Coat of Arms */}
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -257,7 +257,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       {showDifficultyModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white rounded-t-xl">
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-4 text-white rounded-t-xl">
               <h3 className="text-xl font-bold">Select Difficulty</h3>
             </div>
             

@@ -12,13 +12,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ gameState, onDrawCard }) =
   const topCard = getTopCard(gameState);
   
   return (
-    <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-4 shadow-2xl border border-green-500">
+    <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-4 shadow-2xl border border-red-500">
       <div className="flex items-center justify-between">
         {/* Draw Pile - Enhanced with Coat of Arms */}
         <div className="text-center">
           <div
-            className="w-20 h-28 bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-xl border-2 border-emerald-600 
-                       cursor-pointer hover:from-emerald-700 hover:to-emerald-800 transition-all duration-300
+            className="w-20 h-28 bg-gradient-to-br from-red-800 to-red-900 rounded-xl border-2 border-red-600 
+                       cursor-pointer hover:from-red-700 hover:to-red-800 transition-all duration-300
                        flex items-center justify-center shadow-xl transform hover:scale-105 relative overflow-hidden"
             onClick={onDrawCard}
           >

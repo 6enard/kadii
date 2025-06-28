@@ -28,12 +28,12 @@ export const Card: React.FC<CardProps> = ({
   
   const getCategoryGradient = () => {
     switch (category) {
-      case 'penalty': return 'bg-gradient-to-br from-red-100 to-red-200 border-red-400 shadow-red-200';
-      case 'jump': return 'bg-gradient-to-br from-blue-100 to-blue-200 border-blue-400 shadow-blue-200';
-      case 'kickback': return 'bg-gradient-to-br from-purple-100 to-purple-200 border-purple-400 shadow-purple-200';
-      case 'question': return 'bg-gradient-to-br from-yellow-100 to-yellow-200 border-yellow-400 shadow-yellow-200';
-      case 'wild': return 'bg-gradient-to-br from-green-100 to-green-200 border-green-400 shadow-green-200';
-      default: return 'bg-gradient-to-br from-gray-50 to-white border-gray-300 shadow-gray-200';
+      case 'penalty': return 'bg-gradient-to-br from-red-200 to-red-300 border-red-500 shadow-red-300';
+      case 'jump': return 'bg-gradient-to-br from-red-300 to-red-400 border-red-600 shadow-red-400';
+      case 'kickback': return 'bg-gradient-to-br from-red-400 to-red-500 border-red-700 shadow-red-500';
+      case 'question': return 'bg-gradient-to-br from-red-500 to-red-600 border-red-800 shadow-red-600';
+      case 'wild': return 'bg-gradient-to-br from-red-600 to-red-700 border-red-900 shadow-red-700';
+      default: return 'bg-gradient-to-br from-red-100 to-red-200 border-red-400 shadow-red-300';
     }
   };
   
@@ -44,7 +44,7 @@ export const Card: React.FC<CardProps> = ({
         rounded-xl border-2 flex flex-col justify-between p-2 relative
         cursor-pointer transition-all duration-300 shadow-lg
         ${getCategoryGradient()}
-        ${isSelected ? 'ring-4 ring-blue-500 transform -translate-y-3 scale-110 shadow-2xl' : ''}
+        ${isSelected ? 'ring-4 ring-yellow-400 transform -translate-y-3 scale-110 shadow-2xl' : ''}
         ${isPlayable ? 'hover:transform hover:-translate-y-2 hover:shadow-xl hover:scale-105' : ''}
         ${!isPlayable && onClick ? 'opacity-50 cursor-not-allowed' : ''}
         backdrop-blur-sm
@@ -52,8 +52,8 @@ export const Card: React.FC<CardProps> = ({
       onClick={onClick}
     >
       {/* Top corner */}
-      <div className={`font-bold ${suitColor} text-center leading-tight`}>
-        <div className="font-black">{card.rank}</div>
+      <div className="font-bold text-white text-center leading-tight drop-shadow-lg">
+        <div className="font-black text-shadow">{card.rank}</div>
         <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
@@ -68,14 +68,14 @@ export const Card: React.FC<CardProps> = ({
         </div>
         
         {/* Main suit symbol */}
-        <div className={`${suitColor} text-2xl font-bold z-10 drop-shadow-sm`}>
+        <div className="text-white text-2xl font-bold z-10 drop-shadow-lg">
           {SUIT_SYMBOLS[card.suit]}
         </div>
       </div>
       
       {/* Bottom corner (rotated) */}
-      <div className={`font-bold ${suitColor} rotate-180 text-center leading-tight`}>
-        <div className="font-black">{card.rank}</div>
+      <div className="font-bold text-white rotate-180 text-center leading-tight drop-shadow-lg">
+        <div className="font-black text-shadow">{card.rank}</div>
         <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
@@ -86,8 +86,15 @@ export const Card: React.FC<CardProps> = ({
       
       {/* Glow effect for selected cards */}
       {isSelected && (
-        <div className="absolute inset-0 rounded-xl bg-blue-400 opacity-20 animate-pulse"></div>
+        <div className="absolute inset-0 rounded-xl bg-yellow-400 opacity-20 animate-pulse"></div>
       )}
+      
+      {/* Enhanced text shadow for better readability */}
+      <style jsx>{`
+        .text-shadow {
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+      `}</style>
     </div>
   );
 };

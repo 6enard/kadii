@@ -95,20 +95,20 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
     .map(card => card.id) : [];
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-red-800 flex flex-col">
       {/* Fixed Header */}
       <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <button
             onClick={onBackToMenu}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-red-200 transition-colors"
           >
             <ArrowLeft size={20} />
             <span>Back</span>
           </button>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">Multiplayer Kadi</h1>
-            <p className="text-emerald-200 text-sm">Playing with a friend</p>
+            <p className="text-red-200 text-sm">Playing with a friend</p>
           </div>
           <div className="w-16"></div>
         </div>
@@ -120,9 +120,9 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
           {/* Opponent (Player 2) - Enhanced Card Backs */}
           <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
             <div className="flex items-center justify-between mb-2">
-              <h3 className={`font-bold ${gameState.currentPlayerIndex === 1 ? 'text-blue-400' : 'text-gray-300'}`}>
+              <h3 className={`font-bold ${gameState.currentPlayerIndex === 1 ? 'text-red-400' : 'text-gray-300'}`}>
                 👤 {gameState.players[1].name}
-                {gameState.currentPlayerIndex === 1 && <span className="ml-2 text-xs bg-blue-600 px-2 py-1 rounded">Their Turn</span>}
+                {gameState.currentPlayerIndex === 1 && <span className="ml-2 text-xs bg-red-600 px-2 py-1 rounded">Their Turn</span>}
               </h3>
               
               <div className="flex items-center space-x-2 text-sm">
@@ -142,7 +142,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-lg border-2 border-emerald-600 flex flex-col items-center justify-center relative overflow-hidden shadow-lg"
+                  className="w-12 h-16 bg-gradient-to-br from-red-800 to-red-900 rounded-lg border-2 border-red-600 flex flex-col items-center justify-center relative overflow-hidden shadow-lg"
                 >
                   {/* Prominent Kenyan Coat of Arms */}
                   <div className="absolute inset-0 flex items-center justify-center">
