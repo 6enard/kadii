@@ -62,6 +62,25 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
   
   const topCard = getTopCard(gameState);
   
+  // If there's a pending question, check if we can answer it
+  if (gameState.pendingQuestion) {
+    // Can play answer cards or question+answer combo
+    if (cards.length === 1) {
+      const category = getCardCategory(cards[0].rank);
+      if (category === 'answer') {
+        return canPlayCard(cards[0], topCard, gameState.selectedSuit);
+      }
+    }
+    
+    // Question + Answer combo
+    if (cards.length === 2) {
+      return isValidQuestionAnswerCombo(cards) && 
+             canPlayCard(cards[0], topCard, gameState.selectedSuit);
+    }
+    
+    return false;
+  }
+  
   // Single card play
   if (cards.length === 1) {
     return canPlayCard(cards[0], topCard, gameState.selectedSuit);
@@ -76,7 +95,8 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
     if (!allSameRank) {
       // Special case: Question + Answer combo
       if (cards.length === 2) {
-        return isValidQuestionAnswerCombo(cards);
+        return isValidQuestionAnswerCombo(cards) && 
+               canPlayCard(cards[0], topCard, gameState.selectedSuit);
       }
       return false;
     }
@@ -146,8 +166,8 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       break;
       
     case 'kickback':
-      // Reverse turn order - in 2-player mode, this acts like a jump
-      skipNextTurn = true;
+      // King means turn goes to next player (not back to current player)
+      // In 2-player mode, this just moves to the next player normally
       break;
   }
   
@@ -168,7 +188,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     currentPlayer.nikoKadiCalled = false; // Reset for next declaration
   }
   
-  // Move to next player (unless it's a jump/kickback)
+  // Move to next player (unless it's a jump)
   if (!skipNextTurn) {
     nextTurn(newState);
   }
@@ -192,10 +212,8 @@ export function drawCard(gameState: GameState, playerIndex: number): GameState {
     newState.players[playerIndex].hand.push(drawnCard);
   }
   
-  // After drawing a card (when no valid play), turn goes to next player
-  if (newState.pendingQuestion || newState.drawStack === 0) {
-    nextTurn(newState);
-  }
+  // After drawing a card, turn goes to next player
+  nextTurn(newState);
   
   return newState;
 }
@@ -204,16 +222,28 @@ export function handlePenaltyDraw(gameState: GameState): GameState {
   let newState = { ...gameState };
   
   if (newState.drawStack > 0) {
-    const currentPlayer = getCurrentPlayer(newState);
+    const penaltyAmount = newState.drawStack;
     
     // Draw the penalty cards
-    for (let i = 0; i < newState.drawStack; i++) {
-      newState = drawCard(newState, newState.currentPlayerIndex);
+    for (let i = 0; i < penaltyAmount; i++) {
+      // Check if draw pile is empty
+      if (newState.drawPile.length === 0) {
+        // Reshuffle discard pile except top card
+        const topCard = newState.discardPile.pop()!;
+        newState.drawPile = shuffleDeck(newState.discardPile);
+        newState.discardPile = [topCard];
+      }
+      
+      if (newState.drawPile.length > 0) {
+        const drawnCard = newState.drawPile.pop()!;
+        newState.players[newState.currentPlayerIndex].hand.push(drawnCard);
+      }
     }
     
     newState.drawStack = 0;
+    
     // Turn automatically moves to next player after penalty draw
-    // (this is handled in the drawCard function)
+    nextTurn(newState);
   }
   
   return newState;
@@ -249,9 +279,18 @@ function nextTurn(gameState: GameState): void {
   const currentPlayer = getCurrentPlayer(gameState);
   if (currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled) {
     // Player must draw a card for not declaring
-    const drawnState = drawCard(gameState, gameState.currentPlayerIndex);
-    // Copy the updated hand back
-    gameState.players[gameState.currentPlayerIndex].hand = drawnState.players[gameState.currentPlayerIndex].hand;
+    if (gameState.drawPile.length === 0) {
+      // Reshuffle discard pile except top card
+      const topCard = gameState.discardPile.pop()!;
+      gameState.drawPile = shuffleDeck(gameState.discardPile);
+      gameState.discardPile = [topCard];
+    }
+    
+    if (gameState.drawPile.length > 0) {
+      const drawnCard = gameState.drawPile.pop()!;
+      currentPlayer.hand.push(drawnCard);
+    }
+    
     gameState.turnHistory.push(`${currentPlayer.name} forgot to declare "Niko Kadi" and drew a card`);
   }
 }

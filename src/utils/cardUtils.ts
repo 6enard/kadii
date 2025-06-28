@@ -110,6 +110,6 @@ export function isValidQuestionAnswerCombo(cards: Card[]): boolean {
     return false;
   }
   
-  // Must match suit or rank with the top card (this will be checked in canPlayerPlay)
+  // The answer card must be valid to play (this will be checked in canPlayerPlay)
   return true;
 }
