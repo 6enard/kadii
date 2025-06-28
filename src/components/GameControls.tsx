@@ -1,6 +1,7 @@
 import React from 'react';
 import { GameState } from '../types';
 import { getCurrentPlayer } from '../utils/gameLogic';
+import { Play, Zap, Target } from 'lucide-react';
 
 interface GameControlsProps {
   gameState: GameState;
@@ -21,7 +22,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
 }) => {
   const currentPlayer = getCurrentPlayer(gameState);
   const hasPenalty = gameState.drawStack > 0;
-  const isMyTurn = gameState.currentPlayerIndex === 0; // Assuming player 1 is always the human player
+  const isMyTurn = gameState.currentPlayerIndex === 0;
   
   // Get card names for display
   const getSelectedCardNames = () => {
@@ -52,101 +53,89 @@ export const GameControls: React.FC<GameControlsProps> = ({
   
   return (
     <div className="space-y-4">
-      {/* Dedicated Niko Kadi Button - Always visible */}
-      <div className="flex justify-center">
+      {/* Dedicated Niko Kadi Button */}
+      <div className="text-center">
         <button
           onClick={onDeclareNikoKadi}
           disabled={!isMyTurn}
-          className={`px-12 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 
-                     text-white font-bold text-lg rounded-xl transition-all duration-200 transform hover:scale-105
-                     shadow-xl border-4 border-yellow-300 ring-4 ring-yellow-200
-                     ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'animate-pulse'}
-                     ${currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled ? 'animate-bounce' : ''}`}
+          className={`
+            px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400
+            text-black font-bold text-lg rounded-xl transition-all duration-200 transform hover:scale-105
+            shadow-2xl border-2 border-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed
+            ${isMyTurn ? 'animate-pulse shadow-yellow-500/50' : ''}
+            ${currentPlayer.hand.length === 1 && !currentPlayer.nikoKadiCalled ? 'animate-bounce' : ''}
+          `}
         >
-          🎯 DECLARE "NIKO KADI"! 🎯
+          <Target className="inline mr-2" size={20} />
+          NIKO KADI
         </button>
       </div>
 
       {/* Main Controls */}
-      <div className="flex flex-wrap gap-3 justify-center p-4 bg-gray-100 rounded-lg">
+      <div className="space-y-3">
         {/* Play Cards Button */}
         <button
           onClick={onPlayCards}
           disabled={!canPlaySelected || selectedCards.length === 0 || !isMyTurn}
           className={`
-            px-6 py-3 rounded-lg font-bold text-white transition-all duration-200
+            w-full p-4 rounded-xl font-bold transition-all duration-200 transform hover:scale-105
             ${canPlaySelected && selectedCards.length > 0 && isMyTurn
-              ? 'bg-green-500 hover:bg-green-600 transform hover:scale-105' 
-              : 'bg-gray-400 cursor-not-allowed'
+              ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white shadow-lg shadow-green-500/30' 
+              : 'bg-gray-700 text-gray-400 cursor-not-allowed'
             }
           `}
         >
-          {selectedCards.length > 0 ? (
-            <span>
-              Play {selectedCards.length} Card{selectedCards.length > 1 ? 's' : ''} 
-              <span className="text-xs block opacity-90">
-                ({getSelectedCardNames()})
-              </span>
-            </span>
-          ) : (
-            'Select Cards to Play'
-          )}
+          <div className="flex items-center justify-center space-x-2">
+            <Play size={20} />
+            <div>
+              {selectedCards.length > 0 ? (
+                <>
+                  <div>PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}</div>
+                  <div className="text-xs opacity-90">({getSelectedCardNames()})</div>
+                </>
+              ) : (
+                <div>SELECT CARDS</div>
+              )}
+            </div>
+          </div>
         </button>
         
         {/* Draw Penalty Button */}
         {hasPenalty && isMyTurn && (
           <button
             onClick={onDrawPenalty}
-            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold 
-                       rounded-lg transition-all duration-200 transform hover:scale-105"
+            className="w-full p-4 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 
+                       text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105
+                       shadow-lg shadow-red-500/30"
           >
-            Draw {gameState.drawStack} Penalty Cards
+            <div className="flex items-center justify-center space-x-2">
+              <Zap size={20} />
+              <span>DRAW {gameState.drawStack} PENALTY</span>
+            </div>
           </button>
         )}
-        
-        {/* Game Status Info */}
-        <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600 w-full">
-          <span className="bg-blue-100 px-3 py-1 rounded-full">
-            Selected: {selectedCards.length} card{selectedCards.length !== 1 ? 's' : ''}
-          </span>
-          
-          {selectedCards.length > 0 && (
-            <span className="bg-green-100 px-3 py-1 rounded-full text-green-700">
-              {getSelectedCardNames()}
-            </span>
-          )}
-          
-          {gameState.pendingQuestion && (
-            <span className="text-red-600 font-bold animate-pulse bg-red-100 px-3 py-1 rounded-full">
-              🚨 QUESTION MUST BE ANSWERED! 🚨
-            </span>
-          )}
-          
-          {!isMyTurn && (
-            <span className="text-blue-600 font-bold bg-blue-100 px-3 py-1 rounded-full">
-              🤖 Computer's turn
-            </span>
-          )}
-          
-          {hasPenalty && (
-            <span className="text-red-600 font-bold bg-red-100 px-3 py-1 rounded-full">
-              ⚡ Penalty: {gameState.drawStack} cards - Counter with 2, 3, or A!
-            </span>
-          )}
-        </div>
       </div>
       
-      {/* Stacking Help */}
-      {selectedCards.length > 1 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="text-center text-blue-800">
-            <div className="font-semibold mb-1">🃏 Card Stacking Active!</div>
-            <div className="text-sm">
-              You can play multiple cards: same ranks (4♥ 4♠ 4♦) or valid sequences (Q♥ Q♠ 8♠)
-            </div>
+      {/* Status Indicators */}
+      <div className="space-y-2 text-center text-sm">
+        {gameState.pendingQuestion && (
+          <div className="bg-red-500/20 border border-red-500/50 px-3 py-2 rounded-lg text-red-300 animate-pulse">
+            🚨 ANSWER REQUIRED
           </div>
-        </div>
-      )}
+        )}
+        
+        {!isMyTurn && (
+          <div className="bg-blue-500/20 border border-blue-500/50 px-3 py-2 rounded-lg text-blue-300">
+            🤖 OPPONENT'S TURN
+          </div>
+        )}
+        
+        {selectedCards.length > 1 && (
+          <div className="bg-cyan-500/20 border border-cyan-500/50 px-3 py-2 rounded-lg text-cyan-300">
+            🃏 STACKING: {getSelectedCardNames()}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
