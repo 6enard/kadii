@@ -56,15 +56,13 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
     if (!isMyTurn) return;
     
     if (gameState.drawStack > 0) {
+      // Handle penalty draw - turn ends automatically
       const newGameState = handlePenaltyDraw(gameState);
       setGameState(newGameState);
     } else {
+      // Regular draw - turn ends automatically
       const newGameState = drawCard(gameState, gameState.currentPlayerIndex);
       setGameState(newGameState);
-      
-      const nextState = { ...newGameState };
-      nextState.currentPlayerIndex = (nextState.currentPlayerIndex + 1) % nextState.players.length;
-      setGameState(nextState);
     }
   }, [gameState, isMyTurn]);
   
