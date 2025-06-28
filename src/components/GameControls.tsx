@@ -72,7 +72,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
         <div className="flex items-center space-x-4 text-sm text-gray-600">
           <span>Selected: {selectedCards.length}</span>
           {gameState.pendingQuestion && (
-            <span className="text-yellow-600 font-bold">⚠ Must answer question immediately!</span>
+            <span className="text-red-600 font-bold animate-pulse">
+              🚨 QUESTION MUST BE ANSWERED! 🚨
+            </span>
           )}
           {!isMyTurn && (
             <span className="text-blue-600 font-bold">🤖 Computer's turn</span>
