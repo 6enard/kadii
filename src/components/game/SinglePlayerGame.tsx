@@ -41,7 +41,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       const timer = setTimeout(() => {
         const newState = makeAIMove(gameState, gameState.aiDifficulty || 'medium');
         setGameState(newState);
-      }, 1000); // 1 second delay for better UX
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
@@ -75,11 +75,9 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     if (isComputerTurn) return;
     
     if (gameState.drawStack > 0) {
-      // Handle penalty draw - turn ends automatically
       const newGameState = handlePenaltyDraw(gameState);
       setGameState(newGameState);
     } else {
-      // Regular draw - turn ends automatically
       const newGameState = drawCard(gameState, gameState.currentPlayerIndex);
       setGameState(newGameState);
     }
@@ -122,26 +120,37 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     .map(card => card.id) : [];
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-900 flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-green-800 via-green-900 to-emerald-900 relative overflow-hidden">
+      {/* Casino Table Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 1px, transparent 1px),
+                           radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+          backgroundSize: '50px 50px'
+        }}></div>
+      </div>
+
+      {/* Header Bar */}
+      <div className="relative z-10 bg-black bg-opacity-30 backdrop-blur-sm border-b border-green-600">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
             onClick={onBackToMenu}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-green-300 transition-colors"
           >
             <ArrowLeft size={20} />
-            <span>Back</span>
+            <span>Back to Menu</span>
           </button>
+          
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">Kadi vs Computer</h1>
-            <p className="text-emerald-200 text-sm">
-              Difficulty: <span className="capitalize font-semibold">{gameState.aiDifficulty}</span>
+            <h1 className="text-xl font-bold text-white">Kadi Table</h1>
+            <p className="text-green-300 text-sm">
+              vs Computer • <span className="capitalize">{gameState.aiDifficulty}</span>
             </p>
           </div>
+          
           <button
             onClick={() => setShowDifficultyModal(true)}
-            className="flex items-center space-x-2 text-white hover:text-emerald-200 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-green-300 transition-colors"
           >
             <Settings size={20} />
             <span>Settings</span>
@@ -149,85 +158,182 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
         </div>
       </div>
 
-      {/* Main Game Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Computer Player - Compact */}
-          <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className={`font-bold ${isComputerTurn ? 'text-blue-400' : 'text-gray-300'}`}>
-                🤖 Computer
-                {isComputerTurn && <span className="ml-2 text-xs bg-blue-600 px-2 py-1 rounded animate-pulse">Thinking...</span>}
-              </h3>
+      {/* Main Game Table */}
+      <div className="relative z-10 h-[calc(100vh-80px)] flex flex-col">
+        {/* Computer's Area (Top) */}
+        <div className="flex-shrink-0 p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-black bg-opacity-20 rounded-xl p-4 border border-green-600 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">🤖</span>
+                  </div>
+                  <div>
+                    <h3 className={`font-bold ${isComputerTurn ? 'text-yellow-400' : 'text-white'}`}>
+                      Computer
+                    </h3>
+                    {isComputerTurn && (
+                      <div className="text-xs text-yellow-300 animate-pulse">Thinking...</div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <div className="bg-green-700 px-3 py-1 rounded-full text-white text-sm font-medium">
+                    {gameState.players[1].hand.length} cards
+                  </div>
+                  {gameState.players[1].nikoKadiCalled && (
+                    <div className="bg-yellow-500 px-3 py-1 rounded-full text-black text-sm font-bold animate-bounce">
+                      Niko Kadi!
+                    </div>
+                  )}
+                </div>
+              </div>
               
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="bg-gray-600 px-2 py-1 rounded text-white">
-                  {gameState.players[1].hand.length} cards
-                </span>
-                {gameState.players[1].nikoKadiCalled && (
-                  <span className="bg-yellow-500 px-2 py-1 rounded font-bold text-black">
-                    Niko Kadi!
-                  </span>
-                )}
+              {/* Computer's Hidden Cards */}
+              <div className="flex justify-center">
+                <div className="flex space-x-1">
+                  {gameState.players[1].hand.map((_, index) => (
+                    <div
+                      key={index}
+                      className="w-12 h-16 bg-blue-900 rounded-lg border border-blue-700 flex items-center justify-center shadow-lg"
+                    >
+                      <div className="text-white text-xs font-bold">K</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Center Table Area */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-4xl w-full">
+            {/* Game Board - Casino Style */}
+            <div className="bg-green-700 rounded-3xl p-8 border-4 border-yellow-600 shadow-2xl relative">
+              {/* Table Felt Pattern */}
+              <div className="absolute inset-4 rounded-2xl border-2 border-yellow-500 opacity-30"></div>
+              
+              <GameBoard
+                gameState={gameState}
+                onDrawCard={handleDrawCard}
+              />
+            </div>
             
-            {/* Hidden cards - Compact */}
-            <div className="flex flex-wrap gap-1">
-              {gameState.players[1].hand.map((_, index) => (
-                <div
-                  key={index}
-                  className="w-12 h-16 bg-blue-900 rounded-lg border border-blue-700 flex items-center justify-center"
-                >
-                  <div className="text-white text-xs font-bold">K</div>
-                </div>
-              ))}
+            {/* Game Controls - Positioned like betting area */}
+            <div className="mt-6">
+              <GameControls
+                gameState={gameState}
+                selectedCards={selectedCards}
+                onPlayCards={handlePlayCards}
+                onDeclareNikoKadi={handleDeclareNikoKadi}
+                onDrawPenalty={handleDrawPenalty}
+                canPlaySelected={canPlaySelected}
+              />
             </div>
           </div>
-          
-          {/* Game Board - Compact */}
-          <GameBoard
-            gameState={gameState}
-            onDrawCard={handleDrawCard}
-          />
-          
-          {/* Game Controls - Always visible */}
-          <GameControls
-            gameState={gameState}
-            selectedCards={selectedCards}
-            onPlayCards={handlePlayCards}
-            onDeclareNikoKadi={handleDeclareNikoKadi}
-            onDrawPenalty={handleDrawPenalty}
-            canPlaySelected={canPlaySelected}
-          />
-          
-          {/* Player 1 (Current User) */}
-          <PlayerHand
-            player={gameState.players[0]}
-            isCurrentPlayer={gameState.currentPlayerIndex === 0}
-            selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
-            playableCards={playableCards}
-            onCardClick={handleCardClick}
-            isMyTurn={!isComputerTurn}
-          />
-          
-          {/* Game Status - Compact */}
-          <GameStatus gameState={gameState} onNewGame={handleNewGame} />
+        </div>
+
+        {/* Player's Area (Bottom) */}
+        <div className="flex-shrink-0 p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-black bg-opacity-20 rounded-xl p-4 border border-green-600 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">👤</span>
+                  </div>
+                  <div>
+                    <h3 className={`font-bold ${!isComputerTurn ? 'text-yellow-400' : 'text-white'}`}>
+                      You
+                    </h3>
+                    {!isComputerTurn && (
+                      <div className="text-xs text-yellow-300">Your turn</div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <div className="bg-green-700 px-3 py-1 rounded-full text-white text-sm font-medium">
+                    {gameState.players[0].hand.length} cards
+                  </div>
+                  {gameState.players[0].nikoKadiCalled && (
+                    <div className="bg-yellow-500 px-3 py-1 rounded-full text-black text-sm font-bold animate-bounce">
+                      Niko Kadi!
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Player's Cards */}
+              <div className="flex justify-center">
+                <div className="flex flex-wrap gap-2 justify-center max-w-full">
+                  {gameState.players[0].hand.map((card) => (
+                    <div
+                      key={card.id}
+                      onClick={() => !isComputerTurn && handleCardClick(card.id)}
+                      className={`
+                        w-16 h-24 rounded-xl border-2 flex flex-col justify-between p-2 relative
+                        cursor-pointer transition-all duration-300 shadow-lg
+                        ${selectedCards.includes(card.id) 
+                          ? 'ring-4 ring-yellow-400 transform -translate-y-3 scale-110 shadow-2xl bg-white' 
+                          : 'bg-white hover:transform hover:-translate-y-1 hover:shadow-xl'
+                        }
+                        ${!isComputerTurn && playableCards.includes(card.id) 
+                          ? 'border-green-400 hover:border-green-500' 
+                          : 'border-gray-300 opacity-75'
+                        }
+                        ${isComputerTurn ? 'cursor-not-allowed' : ''}
+                      `}
+                    >
+                      {/* Card Content */}
+                      <div className="text-center">
+                        <div className={`font-bold text-sm ${
+                          card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-500' : 'text-black'
+                        }`}>
+                          {card.rank}
+                        </div>
+                        <div className={`text-lg ${
+                          card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-500' : 'text-black'
+                        }`}>
+                          {card.suit === 'hearts' ? '♥' : 
+                           card.suit === 'diamonds' ? '♦' : 
+                           card.suit === 'clubs' ? '♣' : '♠'}
+                        </div>
+                      </div>
+                      
+                      <div className={`text-center rotate-180 text-xs ${
+                        card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-500' : 'text-black'
+                      }`}>
+                        <div className="font-bold">{card.rank}</div>
+                        <div>
+                          {card.suit === 'hearts' ? '♥' : 
+                           card.suit === 'diamonds' ? '♦' : 
+                           card.suit === 'clubs' ? '♣' : '♠'}
+                        </div>
+                      </div>
+                      
+                      {/* Selection indicator */}
+                      {selectedCards.includes(card.id) && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+                          <span className="text-black text-xs font-bold">
+                            {selectedCards.indexOf(card.id) + 1}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Fixed Footer */}
-      <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto text-center">
-          <button
-            onClick={handleNewGame}
-            className="px-6 py-2 bg-white bg-opacity-20 text-white font-bold rounded-lg
-                       hover:bg-opacity-30 transition-all duration-200 transform hover:scale-105"
-          >
-            New Game
-          </button>
-        </div>
-      </div>
+      {/* Game Status */}
+      <GameStatus gameState={gameState} onNewGame={handleNewGame} />
         
       {/* Suit Selector Modal */}
       {gameState.gamePhase === 'selectingSuit' && (
