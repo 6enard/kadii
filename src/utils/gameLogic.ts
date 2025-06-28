@@ -252,16 +252,14 @@ export function drawCard(gameState: GameState, playerIndex: number): GameState {
     newState.turnHistory.push(`${player.name}'s Niko Kadi status reset - drew a card`);
   }
   
-  // CRITICAL: Question cards ALWAYS need an answer - drawing doesn't clear the question
-  // BUT turn only passes if it's NOT a pending question scenario
+  // CRITICAL FIX: When a player draws a card, the question is cleared and game continues normally
   if (newState.pendingQuestion) {
-    newState.turnHistory.push(`${player.name} drew a card but question still needs an answer`);
-    // IMPORTANT: Turn moves to next player, but question remains pending
-    nextTurn(newState);
-  } else {
-    // Normal draw - turn goes to next player
-    nextTurn(newState);
+    newState.pendingQuestion = false;
+    newState.turnHistory.push(`${player.name} drew a card - question cleared, game continues normally`);
   }
+  
+  // Turn moves to next player after drawing
+  nextTurn(newState);
   
   return newState;
 }
@@ -366,8 +364,6 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
   }
   
   // CRITICAL: If there's a pending question, AI must answer it or draw
-  // Question ALWAYS needs an answer - no exceptions!
-  // Turn should NOT pass until question is resolved
   if (newState.pendingQuestion) {
     // Look for answer cards or another question card
     const answerCards = currentPlayer.hand.filter(card => {
@@ -381,7 +377,7 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
       const selectedCard = answerCards[0];
       return playCards(newState, { cardIds: [selectedCard.id] });
     } else {
-      // No answer available, must draw - question remains pending, turn passes
+      // No answer available, must draw - this will clear the question and continue normally
       return drawCard(newState, newState.currentPlayerIndex);
     }
   }
