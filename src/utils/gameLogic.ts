@@ -62,7 +62,15 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
   
   const topCard = getTopCard(gameState);
   
-  // If there's a pending question, check if we can answer it
+  // If there's a penalty stack, can only play penalty cards (2, 3) or Ace to counter
+  if (gameState.drawStack > 0) {
+    return cards.every(card => {
+      const category = getCardCategory(card.rank);
+      return category === 'penalty' || card.rank === 'A';
+    });
+  }
+  
+  // If there's a pending question, only the person who played it can answer
   if (gameState.pendingQuestion) {
     // Can play answer cards or question+answer combo
     if (cards.length === 1) {
@@ -124,10 +132,6 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   // Add cards to discard pile
   newState.discardPile.push(...playedCards);
   
-  // Reset selected suit and pending question
-  newState.selectedSuit = null;
-  newState.pendingQuestion = false;
-  
   // Handle special card effects based on the last played card
   const lastPlayedCard = playedCards[playedCards.length - 1];
   const category = getCardCategory(lastPlayedCard.rank);
@@ -141,34 +145,56 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
         return sum + getPenaltyValue(card.rank);
       }, 0);
       newState.drawStack += totalPenalty;
+      newState.turnHistory.push(`${currentPlayer.name} played penalty cards (+${totalPenalty} cards)`);
       break;
       
     case 'wild':
       if (options.declaredSuit) {
         newState.selectedSuit = options.declaredSuit;
+        newState.turnHistory.push(`${currentPlayer.name} played Ace and chose ${options.declaredSuit}`);
       } else {
         newState.gamePhase = 'selectingSuit';
         return newState;
       }
       // Wild cancels any pending penalty
-      newState.drawStack = 0;
+      if (newState.drawStack > 0) {
+        newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace`);
+        newState.drawStack = 0;
+      }
       break;
       
     case 'question':
       if (playedCards.length === 1) {
         newState.pendingQuestion = true;
+        newState.turnHistory.push(`${currentPlayer.name} played a question card`);
+      } else {
+        // Question + Answer combo
+        newState.pendingQuestion = false;
+        newState.turnHistory.push(`${currentPlayer.name} played question + answer combo`);
       }
       break;
       
     case 'jump':
       // In 2-player mode, current player plays again (skip opponent's turn)
       skipNextTurn = true;
+      newState.turnHistory.push(`${currentPlayer.name} played Jack - plays again!`);
       break;
       
     case 'kickback':
       // King means turn goes to next player (not back to current player)
-      // In 2-player mode, this just moves to the next player normally
+      newState.turnHistory.push(`${currentPlayer.name} played King`);
       break;
+      
+    default:
+      if (newState.pendingQuestion) {
+        newState.pendingQuestion = false;
+        newState.turnHistory.push(`${currentPlayer.name} answered the question`);
+      }
+  }
+  
+  // Reset selected suit if not wild card
+  if (category !== 'wild') {
+    newState.selectedSuit = null;
   }
   
   // Check for win condition
@@ -176,10 +202,12 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     if (currentPlayer.nikoKadiCalled && canWinWithCards(playedCards)) {
       newState.winner = currentPlayer.name;
       newState.gamePhase = 'gameOver';
+      newState.turnHistory.push(`${currentPlayer.name} wins the game!`);
       return newState;
     } else {
       // Invalid win - player must draw a card
       drawCard(newState, newState.currentPlayerIndex);
+      newState.turnHistory.push(`${currentPlayer.name} tried to win illegally and drew a card`);
     }
   }
   
@@ -198,6 +226,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
 
 export function drawCard(gameState: GameState, playerIndex: number): GameState {
   const newState = { ...gameState };
+  const player = newState.players[playerIndex];
   
   // Check if draw pile is empty
   if (newState.drawPile.length === 0) {
@@ -209,11 +238,15 @@ export function drawCard(gameState: GameState, playerIndex: number): GameState {
   
   if (newState.drawPile.length > 0) {
     const drawnCard = newState.drawPile.pop()!;
-    newState.players[playerIndex].hand.push(drawnCard);
+    player.hand.push(drawnCard);
+    newState.turnHistory.push(`${player.name} drew a card`);
   }
   
-  // Clear pending question when a card is drawn
-  newState.pendingQuestion = false;
+  // Clear pending question when a card is drawn (question no longer needs answer)
+  if (newState.pendingQuestion) {
+    newState.pendingQuestion = false;
+    newState.turnHistory.push(`Question card no longer needs answer`);
+  }
   
   // After drawing a card, turn goes to next player
   nextTurn(newState);
@@ -226,6 +259,7 @@ export function handlePenaltyDraw(gameState: GameState): GameState {
   
   if (newState.drawStack > 0) {
     const penaltyAmount = newState.drawStack;
+    const player = getCurrentPlayer(newState);
     
     // Draw the penalty cards
     for (let i = 0; i < penaltyAmount; i++) {
@@ -239,11 +273,12 @@ export function handlePenaltyDraw(gameState: GameState): GameState {
       
       if (newState.drawPile.length > 0) {
         const drawnCard = newState.drawPile.pop()!;
-        newState.players[newState.currentPlayerIndex].hand.push(drawnCard);
+        player.hand.push(drawnCard);
       }
     }
     
-    newState.drawStack = 0;
+    newState.turnHistory.push(`${player.name} drew ${penaltyAmount} penalty cards`);
+    newState.drawStack = 0; // Clear penalty stack
     
     // Turn automatically moves to next player after penalty draw
     nextTurn(newState);
@@ -268,6 +303,7 @@ export function selectSuit(gameState: GameState, suit: string): GameState {
   const newState = { ...gameState };
   newState.selectedSuit = suit as any;
   newState.gamePhase = 'playing';
+  newState.turnHistory.push(`Suit selected: ${suit}`);
   
   // Move to next player after suit selection
   nextTurn(newState);
