@@ -18,6 +18,7 @@ export const Card: React.FC<CardProps> = ({
   size = 'medium'
 }) => {
   const category = getCardCategory(card.rank);
+  const suitColor = SUIT_COLORS[card.suit];
   
   const sizeClasses = {
     small: 'w-12 h-16 text-xs',
@@ -51,9 +52,9 @@ export const Card: React.FC<CardProps> = ({
       onClick={onClick}
     >
       {/* Top corner */}
-      <div className="font-bold text-red-600 text-center leading-tight drop-shadow-sm">
-        <div className="font-black text-shadow-red">{card.rank}</div>
-        <div className="text-lg text-red-500">{SUIT_SYMBOLS[card.suit]}</div>
+      <div className={`font-bold ${suitColor} text-center leading-tight drop-shadow-sm`}>
+        <div className="font-black">{card.rank}</div>
+        <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Center - Kenyan Coat of Arms */}
@@ -67,15 +68,15 @@ export const Card: React.FC<CardProps> = ({
         </div>
         
         {/* Main suit symbol */}
-        <div className="text-red-500 text-2xl font-bold z-10 drop-shadow-sm">
+        <div className={`${suitColor} text-2xl font-bold z-10 drop-shadow-sm`}>
           {SUIT_SYMBOLS[card.suit]}
         </div>
       </div>
       
       {/* Bottom corner (rotated) */}
-      <div className="font-bold text-red-600 rotate-180 text-center leading-tight drop-shadow-sm">
-        <div className="font-black text-shadow-red">{card.rank}</div>
-        <div className="text-lg text-red-500">{SUIT_SYMBOLS[card.suit]}</div>
+      <div className={`font-bold ${suitColor} rotate-180 text-center leading-tight drop-shadow-sm`}>
+        <div className="font-black">{card.rank}</div>
+        <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Special card indicator */}
@@ -87,13 +88,6 @@ export const Card: React.FC<CardProps> = ({
       {isSelected && (
         <div className="absolute inset-0 rounded-xl bg-yellow-400 opacity-20 animate-pulse"></div>
       )}
-      
-      {/* Enhanced text shadow for better readability */}
-      <style jsx>{`
-        .text-shadow-red {
-          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-        }
-      `}</style>
     </div>
   );
 };

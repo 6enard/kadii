@@ -25,12 +25,12 @@ export const SuitSelector: React.FC<SuitSelectorProps> = ({ onSelectSuit }) => {
               className={`
                 w-full h-24 rounded-xl border-2 flex flex-col items-center justify-center
                 hover:bg-gray-50 transition-all duration-300 transform hover:scale-105
-                ${SUIT_COLORS[suit]} border-gray-300 hover:border-gray-400 shadow-lg hover:shadow-xl
+                border-gray-300 hover:border-gray-400 shadow-lg hover:shadow-xl
                 bg-gradient-to-br from-white to-gray-50
               `}
             >
-              <div className="text-4xl mb-1">{SUIT_SYMBOLS[suit]}</div>
-              <div className="text-sm font-bold capitalize">{suit}</div>
+              <div className={`text-4xl mb-1 ${SUIT_COLORS[suit]}`}>{SUIT_SYMBOLS[suit]}</div>
+              <div className="text-sm font-bold capitalize text-gray-700">{suit}</div>
             </button>
           ))}
         </div>

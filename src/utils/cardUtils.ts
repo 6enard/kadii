@@ -11,10 +11,10 @@ export const SUIT_SYMBOLS = {
 };
 
 export const SUIT_COLORS = {
-  hearts: 'text-red-500',
-  diamonds: 'text-red-500',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800'
+  hearts: 'text-red-600',
+  diamonds: 'text-red-600',
+  clubs: 'text-black',
+  spades: 'text-black'
 };
 
 export function createDeck(): Card[] {
