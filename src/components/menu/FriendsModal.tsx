@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2 } from 'lucide-react';
 import { 
   collection, 
@@ -43,13 +43,25 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
   const [error, setError] = useState('');
   const [isOffline, setIsOffline] = useState(false);
 
+  // Use refs to track active listeners and prevent multiple subscriptions
+  const challengesUnsubscribeRef = useRef<(() => void) | null>(null);
+  const friendRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
+  const sentRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     if (isOpen && user) {
       loadAllUsers();
       loadFriends();
-      loadFriendRequests();
-      loadChallenges();
+      setupRealtimeListeners();
+    } else {
+      // Clean up listeners when modal is closed
+      cleanupListeners();
     }
+
+    // Cleanup on unmount
+    return () => {
+      cleanupListeners();
+    };
   }, [isOpen, user]);
 
   useEffect(() => {
@@ -65,6 +77,100 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
     }
   }, [searchQuery, allUsers, user]);
 
+  const cleanupListeners = () => {
+    if (challengesUnsubscribeRef.current) {
+      challengesUnsubscribeRef.current();
+      challengesUnsubscribeRef.current = null;
+    }
+    if (friendRequestsUnsubscribeRef.current) {
+      friendRequestsUnsubscribeRef.current();
+      friendRequestsUnsubscribeRef.current = null;
+    }
+    if (sentRequestsUnsubscribeRef.current) {
+      sentRequestsUnsubscribeRef.current();
+      sentRequestsUnsubscribeRef.current = null;
+    }
+  };
+
+  const setupRealtimeListeners = () => {
+    if (!user?.uid) return;
+
+    // Clean up any existing listeners first
+    cleanupListeners();
+
+    try {
+      // Set up challenges listener
+      const challengesQuery = query(
+        collection(db, 'challenges'),
+        where('toUserId', '==', user.uid),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+      );
+
+      challengesUnsubscribeRef.current = onSnapshot(challengesQuery, (snapshot) => {
+        const incoming: GameChallenge[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          incoming.push({ 
+            id: doc.id, 
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            expiresAt: data.expiresAt?.toDate() || new Date()
+          } as GameChallenge);
+        });
+        setChallenges(incoming);
+        setIsOffline(false);
+      }, (error) => {
+        console.error('Error in challenges listener:', error);
+        handleFirebaseError(error, 'loading challenges');
+      });
+
+      // Set up friend requests listener
+      const incomingRequestsQuery = query(
+        collection(db, 'friendRequests'),
+        where('toUserId', '==', user.uid),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+      );
+
+      friendRequestsUnsubscribeRef.current = onSnapshot(incomingRequestsQuery, (snapshot) => {
+        const incoming: FriendRequest[] = [];
+        snapshot.forEach((doc) => {
+          incoming.push({ id: doc.id, ...doc.data() } as FriendRequest);
+        });
+        setFriendRequests(incoming);
+        setIsOffline(false);
+      }, (error) => {
+        console.error('Error in friend requests listener:', error);
+        handleFirebaseError(error, 'loading friend requests');
+      });
+
+      // Set up sent requests listener
+      const sentRequestsQuery = query(
+        collection(db, 'friendRequests'),
+        where('fromUserId', '==', user.uid),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+      );
+
+      sentRequestsUnsubscribeRef.current = onSnapshot(sentRequestsQuery, (snapshot) => {
+        const sent: FriendRequest[] = [];
+        snapshot.forEach((doc) => {
+          sent.push({ id: doc.id, ...doc.data() } as FriendRequest);
+        });
+        setSentRequests(sent);
+        setIsOffline(false);
+      }, (error) => {
+        console.error('Error in sent requests listener:', error);
+        handleFirebaseError(error, 'loading sent requests');
+      });
+
+    } catch (error: any) {
+      console.error('Error setting up listeners:', error);
+      handleFirebaseError(error, 'setting up real-time listeners');
+    }
+  };
+
   const handleFirebaseError = (error: any, operation: string) => {
     console.error(`Error ${operation}:`, error);
     
@@ -75,6 +181,17 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       setError(`Access denied. Please make sure you're logged in and try again.`);
     } else if (error.code === 'not-found') {
       setError(`Data not found. The requested information may have been removed.`);
+    } else if (error.code === 'already-exists') {
+      // Handle the specific "Target ID already exists" error
+      console.warn('Firestore listener collision detected, retrying...');
+      // Clean up and retry after a short delay
+      setTimeout(() => {
+        cleanupListeners();
+        if (isOpen && user) {
+          setupRealtimeListeners();
+        }
+      }, 1000);
+      return; // Don't show error to user for this case
     } else {
       setError(`Error ${operation}. Please try again later.`);
     }
@@ -147,81 +264,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
     }
   };
 
-  const loadFriendRequests = async () => {
-    if (!user) return;
-
-    try {
-      await enableNetwork(db);
-      
-      // Load incoming friend requests
-      const incomingQuery = query(
-        collection(db, 'friendRequests'),
-        where('toUserId', '==', user.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const incomingSnapshot = await getDocs(incomingQuery);
-      const incoming: FriendRequest[] = [];
-      incomingSnapshot.forEach((doc) => {
-        incoming.push({ id: doc.id, ...doc.data() } as FriendRequest);
-      });
-      
-      // Load sent friend requests
-      const sentQuery = query(
-        collection(db, 'friendRequests'),
-        where('fromUserId', '==', user.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const sentSnapshot = await getDocs(sentQuery);
-      const sent: FriendRequest[] = [];
-      sentSnapshot.forEach((doc) => {
-        sent.push({ id: doc.id, ...doc.data() } as FriendRequest);
-      });
-      
-      setFriendRequests(incoming);
-      setSentRequests(sent);
-      setIsOffline(false);
-    } catch (error: any) {
-      handleFirebaseError(error, 'loading friend requests');
-    }
-  };
-
-  const loadChallenges = async () => {
-    if (!user) return;
-
-    try {
-      await enableNetwork(db);
-      
-      // Load incoming challenges
-      const incomingQuery = query(
-        collection(db, 'challenges'),
-        where('toUserId', '==', user.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const incomingSnapshot = await getDocs(incomingQuery);
-      const incoming: GameChallenge[] = [];
-      incomingSnapshot.forEach((doc) => {
-        const data = doc.data();
-        incoming.push({ 
-          id: doc.id, 
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          expiresAt: data.expiresAt?.toDate() || new Date()
-        } as GameChallenge);
-      });
-      
-      setChallenges(incoming);
-      setIsOffline(false);
-    } catch (error: any) {
-      handleFirebaseError(error, 'loading challenges');
-    }
-  };
-
   const sendFriendRequest = async (toUserId: string, toUsername: string) => {
     if (!user) return;
 
@@ -254,7 +296,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         updatedAt: serverTimestamp()
       });
       
-      await loadFriendRequests();
       setIsOffline(false);
     } catch (error: any) {
       handleFirebaseError(error, 'sending friend request');
@@ -283,10 +324,11 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         await updateDoc(doc(db, 'users', request.fromUserId), {
           friends: arrayUnion(user.uid)
         });
+        
+        // Reload friends list
+        await loadFriends();
       }
       
-      await loadFriendRequests();
-      await loadFriends();
       setIsOffline(false);
     } catch (error: any) {
       handleFirebaseError(error, 'responding to friend request');
@@ -352,12 +394,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         expiresAt: expiresAt
       });
       
-      await loadChallenges();
       setIsOffline(false);
-      
-      // Show success message
       setError('');
-      // You could add a success state here if needed
+      
     } catch (error: any) {
       handleFirebaseError(error, 'sending challenge');
     }
@@ -382,7 +421,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         onClose();
       }
       
-      await loadChallenges();
       setIsOffline(false);
     } catch (error: any) {
       handleFirebaseError(error, 'responding to challenge');
@@ -405,16 +443,13 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       await enableNetwork(db);
       await loadAllUsers();
       await loadFriends();
-      await loadFriendRequests();
-      await loadChallenges();
+      // Real-time listeners will handle the rest
     } catch (error: any) {
       handleFirebaseError(error, 'refreshing data');
     }
   };
 
   const handleClearComplete = () => {
-    // Refresh challenges after clearing
-    loadChallenges();
     setError('');
   };
 

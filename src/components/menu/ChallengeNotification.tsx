@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Gamepad2, Clock } from 'lucide-react';
 import { 
   collection, 
@@ -21,48 +21,92 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
   const { user } = useAuth();
   const [acceptedChallenges, setAcceptedChallenges] = useState<GameChallenge[]>([]);
   const [showNotification, setShowNotification] = useState(false);
+  
+  // Use ref to track the listener and prevent multiple subscriptions
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!user?.uid) {
       setAcceptedChallenges([]);
       setShowNotification(false);
+      // Clean up any existing listener
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
       return;
     }
 
-    // Create the query directly inside useEffect to avoid race conditions
-    const challengesQuery = query(
-      collection(db, 'challenges'),
-      where('fromUserId', '==', user.uid),
-      where('status', '==', 'accepted')
-    );
+    // Clean up any existing listener before creating a new one
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
 
-    const unsubscribe = onSnapshot(challengesQuery, (snapshot) => {
-      const accepted: GameChallenge[] = [];
-      
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        accepted.push({
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          expiresAt: data.expiresAt?.toDate() || new Date()
-        } as GameChallenge);
-      });
+    try {
+      // Create the query
+      const challengesQuery = query(
+        collection(db, 'challenges'),
+        where('fromUserId', '==', user.uid),
+        where('status', '==', 'accepted')
+      );
 
-      if (accepted.length > 0) {
-        setAcceptedChallenges(accepted);
-        setShowNotification(true);
-      } else {
+      // Set up the listener with proper error handling
+      unsubscribeRef.current = onSnapshot(challengesQuery, (snapshot) => {
+        const accepted: GameChallenge[] = [];
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          accepted.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            expiresAt: data.expiresAt?.toDate() || new Date()
+          } as GameChallenge);
+        });
+
+        if (accepted.length > 0) {
+          setAcceptedChallenges(accepted);
+          setShowNotification(true);
+        } else {
+          setAcceptedChallenges([]);
+          setShowNotification(false);
+        }
+      }, (error) => {
+        console.error('Error listening to challenges:', error);
+        
+        // Handle the specific "Target ID already exists" error
+        if (error.code === 'already-exists') {
+          console.warn('Firestore listener collision in ChallengeNotification, retrying...');
+          // Clean up and retry after a short delay
+          setTimeout(() => {
+            if (unsubscribeRef.current) {
+              unsubscribeRef.current();
+              unsubscribeRef.current = null;
+            }
+            // The useEffect will run again and recreate the listener
+          }, 1000);
+          return;
+        }
+        
+        // For other errors, reset state
         setAcceptedChallenges([]);
         setShowNotification(false);
-      }
-    }, (error) => {
-      console.error('Error listening to challenges:', error);
+      });
+
+    } catch (error) {
+      console.error('Error setting up challenge notification listener:', error);
       setAcceptedChallenges([]);
       setShowNotification(false);
-    });
+    }
 
-    return () => unsubscribe();
+    // Cleanup function
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+    };
   }, [user?.uid]);
 
   const handleStartGame = async (challenge: GameChallenge) => {
