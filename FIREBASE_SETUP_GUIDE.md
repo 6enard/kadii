@@ -57,6 +57,30 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
     
+    match /friendRequests/{requestId} {
+      // Allow authenticated users to create friend requests
+      allow create: if request.auth != null;
+      // Allow users to read friend requests where they are sender or recipient
+      allow read: if request.auth != null && 
+        (resource.data.senderId == request.auth.uid || 
+         resource.data.recipientId == request.auth.uid);
+      // Allow recipients to update friend requests (accept/decline)
+      allow update: if request.auth != null && 
+        resource.data.recipientId == request.auth.uid;
+    }
+    
+    match /challenges/{challengeId} {
+      // Allow authenticated users to create challenges
+      allow create: if request.auth != null;
+      // Allow users to read challenges where they are challenger or challenged
+      allow read: if request.auth != null && 
+        (resource.data.challengerId == request.auth.uid || 
+         resource.data.challengedId == request.auth.uid);
+      // Allow challenged users to update challenges (accept/decline)
+      allow update: if request.auth != null && 
+        resource.data.challengedId == request.auth.uid;
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
@@ -67,7 +91,7 @@ service cloud.firestore {
 
 3. Click **Publish**
 
-**IMPORTANT:** The key fix here is separating `create` permission from other operations. This explicitly allows newly authenticated users to create their initial user document.
+**IMPORTANT:** The key fix here is adding explicit rules for `friendRequests` and `challenges` collections, allowing authenticated users to create, read (when involved), and update (when recipient) these documents.
 
 ## Step 4: Test the Complete Flow
 
@@ -120,6 +144,9 @@ After successful registration, check:
 ### Issue: "Missing or insufficient permissions" during sign-up
 **Solution:** This is the main issue! Make sure you've updated the security rules in Step 3.2 with the explicit `allow create` rule.
 
+### Issue: "Missing or insufficient permissions" when loading challenges
+**Solution:** Make sure you've updated the security rules to include the `friendRequests` and `challenges` collections as shown in Step 3.2.
+
 ### Issue: "User not found" during sign-in
 **Solution:** Make sure "Email enumeration protection" is DISABLED in Authentication Settings
 
@@ -150,6 +177,30 @@ service cloud.firestore {
       // Allow reading limited public user info for friends
       allow read: if request.auth != null && 
         resource.data.keys().hasAll(['username', 'gamesPlayed', 'gamesWon']);
+    }
+    
+    match /friendRequests/{requestId} {
+      // Allow authenticated users to create friend requests
+      allow create: if request.auth != null;
+      // Allow users to read friend requests where they are sender or recipient
+      allow read: if request.auth != null && 
+        (resource.data.senderId == request.auth.uid || 
+         resource.data.recipientId == request.auth.uid);
+      // Allow recipients to update friend requests (accept/decline)
+      allow update: if request.auth != null && 
+        resource.data.recipientId == request.auth.uid;
+    }
+    
+    match /challenges/{challengeId} {
+      // Allow authenticated users to create challenges
+      allow create: if request.auth != null;
+      // Allow users to read challenges where they are challenger or challenged
+      allow read: if request.auth != null && 
+        (resource.data.challengerId == request.auth.uid || 
+         resource.data.challengedId == request.auth.uid);
+      // Allow challenged users to update challenges (accept/decline)
+      allow update: if request.auth != null && 
+        resource.data.challengedId == request.auth.uid;
     }
   }
 }
@@ -182,5 +233,6 @@ When a user registers, this is what should be automatically created:
 - ✅ **Username validation (3-20 characters)**
 - ✅ **Email validation and normalization**
 - ✅ **Explicit `create` permission for new user documents**
+- ✅ **Security rules for friendRequests and challenges collections**
 
 The app will now automatically handle user registration and create the proper database structure!
