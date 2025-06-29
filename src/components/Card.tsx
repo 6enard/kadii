@@ -50,7 +50,7 @@ export const Card: React.FC<CardProps> = ({
       `}
       onClick={onClick}
     >
-      {/* Top corner - MUCH LARGER AND CLEARER */}
+      {/* Top corner only */}
       <div className={`${suitColor} text-center leading-none p-1 bg-white rounded-tl-xl rounded-br-lg`}>
         <div className="font-black text-lg">{card.rank}</div>
         <div className="text-xl">{SUIT_SYMBOLS[card.suit]}</div>
@@ -71,12 +71,6 @@ export const Card: React.FC<CardProps> = ({
         <div className={`${suitColor} text-3xl font-black z-10 bg-white rounded-full w-12 h-12 flex items-center justify-center`}>
           {SUIT_SYMBOLS[card.suit]}
         </div>
-      </div>
-      
-      {/* Bottom corner (rotated) - MUCH LARGER AND CLEARER */}
-      <div className={`${suitColor} rotate-180 text-center leading-none p-1 bg-white rounded-br-xl rounded-tl-lg`}>
-        <div className="font-black text-lg">{card.rank}</div>
-        <div className="text-xl">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Special card indicator */}
