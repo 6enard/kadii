@@ -1,52 +1,49 @@
 # Complete Firebase Setup Guide for Kadi Card Game
 
-## Current Issue
-You have a Firestore document but no corresponding user in Firebase Authentication. This means the document was created manually. Let's fix this and ensure proper automatic registration.
+## Current Issue - FIXED
+The Firestore security rules had incorrect field names for the challenges collection. The rules were looking for `challengerId` and `challengedId`, but the code uses `fromUserId` and `toUserId`.
 
-## Step 1: Clean Up Current Data
+## Step 1: Firebase Authentication Setup
 
-### 1.1 Delete the Manual Document
-1. Go to [Firebase Console](https://console.firebase.google.com) → Your Project → Firestore Database
-2. Find the `users` collection
-3. Delete the document you created manually (the one with test@gmail.com)
-4. This ensures we start fresh with proper automatic registration
+### 1.1 Enable Authentication
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Select your project: **kadii-171f7**
+3. Click **Authentication** in the left sidebar
+4. Click **Get started** if not already enabled
+5. Go to **Sign-in method** tab
 
-## Step 2: Firebase Authentication Setup
-
-### 2.1 Enable Authentication
-1. Go to Firebase Console → Authentication
-2. Click **Get started** if not already enabled
-3. Go to **Sign-in method** tab
-
-### 2.2 Configure Email/Password Authentication
+### 1.2 Configure Email/Password Authentication
 1. Click on **Email/Password** provider
 2. **Enable** the first option (Email/Password)
 3. **DISABLE** the second option (Email link - passwordless sign-in)
 4. Click **Save**
 
-### 2.3 Authentication Settings (Important!)
+### 1.3 Authentication Settings
 1. Go to **Settings** tab in Authentication
 2. Under **User actions**:
-   - **DISABLE** "Email enumeration protection" (this prevents the "user not found" errors during development)
+   - **DISABLE** "Email enumeration protection" (for easier development)
 3. Under **Authorized domains**:
-   - Make sure `localhost` is listed for development
-   - Add your production domain when you deploy
+   - Make sure your domain is listed (should include localhost for development)
 
-## Step 3: Firestore Database Setup
+## Step 2: Firestore Database Setup
 
-### 3.1 Verify Database Exists
-1. Go to Firestore Database in Firebase Console
-2. If not created, click **Create database** → **Start in test mode**
-3. Choose your preferred location
+### 2.1 Create Firestore Database
+1. Click **Firestore Database** in the left sidebar
+2. Click **Create database**
+3. Choose **Start in test mode** (we'll secure it later)
+4. Select your preferred location (choose closest to your users)
+5. Click **Done**
 
-### 3.2 Set Up Security Rules (CRITICAL FIX)
+### 2.2 Set Up Security Rules (CRITICAL - CORRECTED FIELD NAMES)
+
 1. Go to **Rules** tab in Firestore
-2. Replace with these rules:
+2. Replace your current rules with these CORRECTED rules:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Users can read and write their own user document
     match /users/{userId} {
       // Allow users to create their own document upon registration
       allow create: if request.auth != null && request.auth.uid == userId;
@@ -57,28 +54,39 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
     
+    // Friend requests collection
     match /friendRequests/{requestId} {
       // Allow authenticated users to create friend requests
       allow create: if request.auth != null;
       // Allow users to read friend requests where they are sender or recipient
       allow read: if request.auth != null && 
-        (resource.data.senderId == request.auth.uid || 
-         resource.data.recipientId == request.auth.uid);
+        (resource.data.fromUserId == request.auth.uid || 
+         resource.data.toUserId == request.auth.uid);
       // Allow recipients to update friend requests (accept/decline)
       allow update: if request.auth != null && 
-        resource.data.recipientId == request.auth.uid;
+        resource.data.toUserId == request.auth.uid;
+      // Allow deletion of friend requests
+      allow delete: if request.auth != null && 
+        (resource.data.fromUserId == request.auth.uid || 
+         resource.data.toUserId == request.auth.uid);
     }
     
+    // Game challenges collection - CORRECTED FIELD NAMES
     match /challenges/{challengeId} {
       // Allow authenticated users to create challenges
       allow create: if request.auth != null;
       // Allow users to read challenges where they are challenger or challenged
+      // FIXED: Using correct field names fromUserId and toUserId
       allow read: if request.auth != null && 
-        (resource.data.challengerId == request.auth.uid || 
-         resource.data.challengedId == request.auth.uid);
+        (resource.data.fromUserId == request.auth.uid || 
+         resource.data.toUserId == request.auth.uid);
       // Allow challenged users to update challenges (accept/decline)
       allow update: if request.auth != null && 
-        resource.data.challengedId == request.auth.uid;
+        resource.data.toUserId == request.auth.uid;
+      // Allow deletion of challenges
+      allow delete: if request.auth != null && 
+        (resource.data.fromUserId == request.auth.uid || 
+         resource.data.toUserId == request.auth.uid);
     }
     
     // Deny all other access
@@ -91,148 +99,207 @@ service cloud.firestore {
 
 3. Click **Publish**
 
-**IMPORTANT:** The key fix here is adding explicit rules for `friendRequests` and `challenges` collections, allowing authenticated users to create, read (when involved), and update (when recipient) these documents.
+**CRITICAL FIX:** The security rules now use the correct field names:
+- `fromUserId` instead of `challengerId`
+- `toUserId` instead of `challengedId`
 
-## Step 4: Test the Complete Flow
+This matches exactly what your code is using when creating and querying challenges.
 
-### 4.1 Test User Registration
+## Step 3: Test the Setup
+
+### 3.1 Test User Registration
 1. Run your app: `npm run dev`
 2. Click **Sign In / Sign Up**
-3. Switch to **Sign Up** mode
-4. Create a new account with:
+3. Create a new account with:
    - Username: "testplayer"
    - Email: "test@example.com"
    - Password: "password123"
 
-### 4.2 Verify Both Systems
-After successful registration, check:
+### 3.2 Verify Database Creation
+1. Go back to Firestore Console
+2. Check the **users** collection
+3. You should see a new document with the user's UID as the document ID
+4. Verify all fields are populated correctly
 
-**Firebase Authentication:**
-1. Go to Authentication → Users
-2. You should see the new user with the email you used
-3. Note the User UID (this will be the document ID in Firestore)
+### 3.3 Test Friends Feature
+1. Create a second test account
+2. Try searching for users in the Friends modal
+3. Add the first user as a friend
+4. Verify the friends array is updated in both user documents
 
-**Firestore Database:**
-1. Go to Firestore Database → Data
-2. You should see a `users` collection
-3. Inside, a document with the User UID as the document ID
-4. The document should contain:
-   ```
-   username: "testplayer"
-   email: "test@example.com"
-   createdAt: [current timestamp]
-   gamesPlayed: 0
-   gamesWon: 0
-   friends: [] (empty array)
-   ```
-
-## Step 5: Test Friends Feature
-
-### 5.1 Create a Second User
-1. Sign out from the first account
-2. Create another test account
-3. Verify it appears in both Authentication and Firestore
-
-### 5.2 Test Friend Search
+### 3.4 Test Challenges Feature
 1. Sign in with the first account
-2. Click **Find Friends**
-3. You should see the second user in the search results
-4. Try adding them as a friend
+2. Go to Friends & Challenges
+3. Add a friend if you haven't already
+4. Try sending a challenge to your friend
+5. Sign in with the second account
+6. Check the Challenges tab - you should see the incoming challenge
+7. Try accepting or declining the challenge
 
-## Step 6: Troubleshooting Common Issues
+## Step 4: Production Considerations
 
-### Issue: "Missing or insufficient permissions" during sign-up
-**Solution:** This is the main issue! Make sure you've updated the security rules in Step 3.2 with the explicit `allow create` rule.
-
-### Issue: "Missing or insufficient permissions" when loading challenges
-**Solution:** Make sure you've updated the security rules to include the `friendRequests` and `challenges` collections as shown in Step 3.2.
-
-### Issue: "User not found" during sign-in
-**Solution:** Make sure "Email enumeration protection" is DISABLED in Authentication Settings
-
-### Issue: "Permission denied" in Firestore
-**Solution:** Check your security rules are set correctly (Step 3.2)
-
-### Issue: User created in Auth but not in Firestore
-**Solution:** Check browser console for errors. The AuthModal component should handle this automatically.
-
-### Issue: Friends search shows no results
-**Solution:** Make sure users have `username` field populated and security rules allow reading other users' data
-
-## Step 7: Production Considerations
-
-### 7.1 Security Rules for Production
-For production, use more restrictive rules:
+### 4.1 Security Rules (Production Ready)
+For production, use these more restrictive rules:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      // Allow users to create their own document upon registration
-      allow create: if request.auth != null && request.auth.uid == userId;
       // Users can only read/write their own document
+      allow create: if request.auth != null && request.auth.uid == userId;
       allow read, update, delete: if request.auth != null && request.auth.uid == userId;
       
-      // Allow reading limited public user info for friends
+      // Allow reading public user info for friends (limited fields)
       allow read: if request.auth != null && 
         resource.data.keys().hasAll(['username', 'gamesPlayed', 'gamesWon']);
     }
     
     match /friendRequests/{requestId} {
-      // Allow authenticated users to create friend requests
       allow create: if request.auth != null;
-      // Allow users to read friend requests where they are sender or recipient
       allow read: if request.auth != null && 
-        (resource.data.senderId == request.auth.uid || 
-         resource.data.recipientId == request.auth.uid);
-      // Allow recipients to update friend requests (accept/decline)
+        (resource.data.fromUserId == request.auth.uid || 
+         resource.data.toUserId == request.auth.uid);
       allow update: if request.auth != null && 
-        resource.data.recipientId == request.auth.uid;
+        resource.data.toUserId == request.auth.uid;
     }
     
     match /challenges/{challengeId} {
-      // Allow authenticated users to create challenges
       allow create: if request.auth != null;
-      // Allow users to read challenges where they are challenger or challenged
       allow read: if request.auth != null && 
-        (resource.data.challengerId == request.auth.uid || 
-         resource.data.challengedId == request.auth.uid);
-      // Allow challenged users to update challenges (accept/decline)
+        (resource.data.fromUserId == request.auth.uid || 
+         resource.data.toUserId == request.auth.uid);
       allow update: if request.auth != null && 
-        resource.data.challengedId == request.auth.uid;
+        resource.data.toUserId == request.auth.uid;
     }
   }
 }
 ```
 
-### 7.2 Enable Email Enumeration Protection
-In production, re-enable "Email enumeration protection" for better security.
+### 4.2 Indexes (if needed)
+If you experience slow queries, create these indexes:
+1. Go to **Indexes** tab in Firestore
+2. Create composite indexes for:
+   - Collection: `friendRequests`
+   - Fields: `toUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
+   - Fields: `fromUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
+   - Collection: `challenges`
+   - Fields: `toUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
+   - Fields: `fromUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
 
-## Expected Document Structure
+### 4.3 Backup Strategy
+1. Go to **Backups** tab
+2. Set up automatic backups for your database
 
-When a user registers, this is what should be automatically created:
+## Step 5: Environment Variables
 
+Your current Firebase config in `src/firebase/config.ts` is correct:
+
+```typescript
+const firebaseConfig = {
+  apiKey: "AIzaSyC5wi6x-V1LfZW90Ch5KH5pVnSyaLdNOFw",
+  authDomain: "kadii-171f7.firebaseapp.com",
+  projectId: "kadii-171f7",
+  storageBucket: "kadii-171f7.firebasestorage.app",
+  messagingSenderId: "261075441082",
+  appId: "1:261075441082:web:9960496d0815757dfef983",
+  measurementId: "G-M29H6YL64F"
+};
+```
+
+## Step 6: Troubleshooting
+
+### Common Issues:
+
+1. **"Permission denied" errors**
+   - Check your Firestore security rules match the field names in your code
+   - Ensure user is authenticated
+   - Verify document structure matches rules
+
+2. **"Missing or insufficient permissions" when loading challenges**
+   - This was the main issue - make sure you've updated the security rules with the correct field names (`fromUserId` and `toUserId`)
+
+3. **Users not found in search**
+   - Check if user documents are being created properly
+   - Verify the username field exists and is populated
+   - Check network connectivity
+
+4. **Friends not being added**
+   - Verify both users exist in the database
+   - Check if the friends array field exists
+   - Ensure proper permissions in security rules
+
+5. **Authentication errors**
+   - Verify Email/Password is enabled in Firebase Console
+   - Check if email enumeration protection is disabled for development
+   - Ensure authorized domains include your development URL
+
+## Step 7: Monitoring and Analytics
+
+1. **Authentication Monitoring**
+   - Go to Authentication → Users to see registered users
+   - Monitor sign-in methods and user activity
+
+2. **Database Monitoring**
+   - Go to Firestore → Usage to monitor reads/writes
+   - Check for any security rule violations
+
+3. **Error Monitoring**
+   - Check the Firebase Console for any errors
+   - Monitor the browser console for client-side errors
+
+## Expected Document Structures
+
+### Users Collection
 ```javascript
-// Document ID: Firebase Auth User UID (e.g., "abc123def456")
+// Document ID: Firebase Auth User UID
 {
-  username: "string",      // User's chosen username
-  email: "string",         // User's email (lowercase, trimmed)
-  createdAt: "timestamp",  // Account creation date
-  gamesPlayed: 0,          // Total games played (number)
-  gamesWon: 0,             // Total games won (number)
-  friends: []              // Array of friend UIDs (empty initially)
+  username: "string",
+  email: "string", 
+  createdAt: "timestamp",
+  gamesPlayed: 0,
+  gamesWon: 0,
+  friends: [] // Array of friend user IDs
 }
 ```
 
-## Key Points:
-- ✅ **Document ID = Firebase Auth UID** (automatic linking)
-- ✅ **No manual document creation needed**
-- ✅ **Registration creates both Auth user AND Firestore document**
-- ✅ **Friends array starts empty, not with empty string**
-- ✅ **Username validation (3-20 characters)**
-- ✅ **Email validation and normalization**
-- ✅ **Explicit `create` permission for new user documents**
-- ✅ **Security rules for friendRequests and challenges collections**
+### Friend Requests Collection
+```javascript
+// Document ID: Auto-generated
+{
+  fromUserId: "string",    // Sender's user ID
+  fromUsername: "string",  // Sender's username
+  toUserId: "string",      // Recipient's user ID
+  toUsername: "string",    // Recipient's username
+  status: "pending",       // "pending", "accepted", "rejected"
+  createdAt: "timestamp",
+  updatedAt: "timestamp"
+}
+```
 
-The app will now automatically handle user registration and create the proper database structure!
+### Challenges Collection
+```javascript
+// Document ID: Auto-generated
+{
+  fromUserId: "string",    // Challenger's user ID
+  fromUsername: "string",  // Challenger's username
+  toUserId: "string",      // Challenged user's ID
+  toUsername: "string",    // Challenged user's username
+  status: "pending",       // "pending", "accepted", "rejected", "expired"
+  gameType: "multiplayer",
+  createdAt: "timestamp",
+  expiresAt: "timestamp"   // 5 minutes from creation
+}
+```
+
+## Next Steps
+
+Once this setup is complete, your app will:
+- ✅ Allow users to register and sign in
+- ✅ Automatically create user profiles in Firestore
+- ✅ Enable the friends search and add functionality with friend requests
+- ✅ Support game challenges between friends
+- ✅ Secure user data with proper access controls
+- ✅ Support future multiplayer features
+
+The key fix was correcting the field names in the security rules to match what the code actually uses!
