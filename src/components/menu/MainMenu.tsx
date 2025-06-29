@@ -9,9 +9,14 @@ import { FriendsModal } from './FriendsModal';
 interface MainMenuProps {
   onStartSinglePlayer: () => void;
   onStartMultiplayer: () => void;
+  onStartChallengeGame?: (opponentId: string, opponentName: string) => void;
 }
 
-export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStartMultiplayer }) => {
+export const MainMenu: React.FC<MainMenuProps> = ({ 
+  onStartSinglePlayer, 
+  onStartMultiplayer,
+  onStartChallengeGame 
+}) => {
   const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
@@ -21,6 +26,15 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
       await signOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  };
+
+  const handleStartChallenge = (opponentId: string, opponentName: string) => {
+    if (onStartChallengeGame) {
+      onStartChallengeGame(opponentId, opponentName);
+    } else {
+      // Fallback to regular multiplayer
+      onStartMultiplayer();
     }
   };
 
@@ -96,8 +110,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
                       <Search size={24} />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-xl font-semibold">Find Friends</h3>
-                      <p className="text-purple-100 text-sm">Search and add friends</p>
+                      <h3 className="text-xl font-semibold">Friends & Challenges</h3>
+                      <p className="text-purple-100 text-sm">Manage friends and game challenges</p>
                     </div>
                   </div>
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -179,7 +193,11 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       {user && (
-        <FriendsModal isOpen={showFriendsModal} onClose={() => setShowFriendsModal(false)} />
+        <FriendsModal 
+          isOpen={showFriendsModal} 
+          onClose={() => setShowFriendsModal(false)}
+          onStartChallenge={handleStartChallenge}
+        />
       )}
     </div>
   );

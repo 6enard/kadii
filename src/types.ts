@@ -35,3 +35,44 @@ export interface PlayCardOptions {
   cardIds: string[];
   declaredSuit?: Suit;
 }
+
+// Friend system types
+export type FriendRequestStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  fromUsername: string;
+  toUserId: string;
+  toUsername: string;
+  status: FriendRequestStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserData {
+  id: string;
+  username: string;
+  email: string;
+  gamesPlayed: number;
+  gamesWon: number;
+  friends: string[]; // Array of friend user IDs
+  createdAt: Date;
+  isOnline?: boolean;
+  lastSeen?: Date;
+}
+
+// Challenge system types
+export type ChallengeStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
+
+export interface GameChallenge {
+  id: string;
+  fromUserId: string;
+  fromUsername: string;
+  toUserId: string;
+  toUsername: string;
+  status: ChallengeStatus;
+  gameType: 'multiplayer';
+  createdAt: Date;
+  expiresAt: Date;
+}
