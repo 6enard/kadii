@@ -39,7 +39,7 @@ You have a Firestore document but no corresponding user in Firebase Authenticati
 2. If not created, click **Create database** → **Start in test mode**
 3. Choose your preferred location
 
-### 3.2 Set Up Security Rules
+### 3.2 Set Up Security Rules (CRITICAL FIX)
 1. Go to **Rules** tab in Firestore
 2. Replace with these rules:
 
@@ -47,9 +47,11 @@ You have a Firestore document but no corresponding user in Firebase Authenticati
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow users to create their own document upon registration
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Allow users to read, update, and delete their own document
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
       
       // Allow users to read other users' public info for friends feature
       allow read: if request.auth != null;
@@ -64,6 +66,8 @@ service cloud.firestore {
 ```
 
 3. Click **Publish**
+
+**IMPORTANT:** The key fix here is separating `create` permission from other operations. This explicitly allows newly authenticated users to create their initial user document.
 
 ## Step 4: Test the Complete Flow
 
@@ -113,6 +117,9 @@ After successful registration, check:
 
 ## Step 6: Troubleshooting Common Issues
 
+### Issue: "Missing or insufficient permissions" during sign-up
+**Solution:** This is the main issue! Make sure you've updated the security rules in Step 3.2 with the explicit `allow create` rule.
+
 ### Issue: "User not found" during sign-in
 **Solution:** Make sure "Email enumeration protection" is DISABLED in Authentication Settings
 
@@ -135,8 +142,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
+      // Allow users to create their own document upon registration
+      allow create: if request.auth != null && request.auth.uid == userId;
       // Users can only read/write their own document
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
       
       // Allow reading limited public user info for friends
       allow read: if request.auth != null && 
@@ -172,5 +181,6 @@ When a user registers, this is what should be automatically created:
 - ✅ **Friends array starts empty, not with empty string**
 - ✅ **Username validation (3-20 characters)**
 - ✅ **Email validation and normalization**
+- ✅ **Explicit `create` permission for new user documents**
 
 The app will now automatically handle user registration and create the proper database structure!
