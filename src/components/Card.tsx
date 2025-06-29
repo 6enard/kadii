@@ -41,7 +41,7 @@ export const Card: React.FC<CardProps> = ({
     <div
       className={`
         ${sizeClasses[size]}
-        rounded-xl border-2 flex flex-col justify-between p-2 relative
+        rounded-xl border-2 flex flex-col relative
         cursor-pointer transition-all duration-300 shadow-lg
         ${getCategoryGradient()}
         ${isSelected ? 'ring-4 ring-yellow-400 transform -translate-y-3 scale-110 shadow-2xl' : ''}
@@ -51,15 +51,16 @@ export const Card: React.FC<CardProps> = ({
       `}
       onClick={onClick}
     >
-      {/* Top corner */}
-      <div className={`font-bold ${suitColor} text-center leading-tight drop-shadow-sm`}>
-        <div className="font-black">{card.rank}</div>
-        <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
+      {/* Top corner - MUCH LARGER AND CLEARER */}
+      <div className={`${suitColor} text-center leading-none p-1 bg-white bg-opacity-90 rounded-tl-xl rounded-br-lg`}>
+        <div className="font-black text-lg drop-shadow-sm">{card.rank}</div>
+        <div className="text-xl drop-shadow-sm">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
-      {/* Center - Kenyan Coat of Arms */}
+      {/* Center - Kenyan Coat of Arms with PROMINENT suit symbol */}
       <div className="flex-1 flex items-center justify-center relative">
-        <div className="absolute inset-0 flex items-center justify-center opacity-15">
+        {/* Background coat of arms - subtle */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-10">
           <img 
             src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Coat_of_arms_of_Kenya_%28Official%29.svg/1200px-Coat_of_arms_of_Kenya_%28Official%29.svg.png" 
             alt="Kenya Coat of Arms"
@@ -67,21 +68,21 @@ export const Card: React.FC<CardProps> = ({
           />
         </div>
         
-        {/* Main suit symbol */}
-        <div className={`${suitColor} text-2xl font-bold z-10 drop-shadow-sm`}>
+        {/* PROMINENT suit symbol in center */}
+        <div className={`${suitColor} text-3xl font-black z-10 drop-shadow-lg bg-white bg-opacity-80 rounded-full w-12 h-12 flex items-center justify-center`}>
           {SUIT_SYMBOLS[card.suit]}
         </div>
       </div>
       
-      {/* Bottom corner (rotated) */}
-      <div className={`font-bold ${suitColor} rotate-180 text-center leading-tight drop-shadow-sm`}>
-        <div className="font-black">{card.rank}</div>
-        <div className="text-lg">{SUIT_SYMBOLS[card.suit]}</div>
+      {/* Bottom corner (rotated) - MUCH LARGER AND CLEARER */}
+      <div className={`${suitColor} rotate-180 text-center leading-none p-1 bg-white bg-opacity-90 rounded-br-xl rounded-tl-lg`}>
+        <div className="font-black text-lg drop-shadow-sm">{card.rank}</div>
+        <div className="text-xl drop-shadow-sm">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Special card indicator */}
       {category !== 'answer' && (
-        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 animate-pulse"></div>
+        <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 animate-pulse border border-white"></div>
       )}
       
       {/* Glow effect for selected cards */}

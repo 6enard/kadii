@@ -24,6 +24,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
   const [friends, setFriends] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'friends'>('search');
+  const [searchError, setSearchError] = useState('');
 
   useEffect(() => {
     if (isOpen && user) {
@@ -60,73 +61,59 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
     if (!searchQuery.trim() || !user) return;
 
     setLoading(true);
+    setSearchError('');
+    
     try {
       const usersRef = collection(db, 'users');
       
-      // Search by username (case-insensitive)
-      const usernameQuery = query(
-        usersRef,
-        where('username', '>=', searchQuery.toLowerCase()),
-        where('username', '<=', searchQuery.toLowerCase() + '\uf8ff')
-      );
-      
-      // Also search by exact match (case-sensitive)
-      const exactQuery = query(
-        usersRef,
-        where('username', '==', searchQuery)
-      );
-      
-      const [usernameSnapshot, exactSnapshot] = await Promise.all([
-        getDocs(usernameQuery),
-        getDocs(exactQuery)
-      ]);
-      
+      // Get all users and filter client-side for better search results
+      const allUsersSnapshot = await getDocs(usersRef);
       const results: UserData[] = [];
-      const seenIds = new Set<string>();
       
-      // Process exact matches first
-      exactSnapshot.forEach((doc) => {
-        if (doc.id !== user.uid && !seenIds.has(doc.id)) {
-          results.push({
-            id: doc.id,
-            ...doc.data()
-          } as UserData);
-          seenIds.add(doc.id);
-        }
-      });
-      
-      // Then process partial matches
-      usernameSnapshot.forEach((doc) => {
-        if (doc.id !== user.uid && !seenIds.has(doc.id)) {
-          results.push({
-            id: doc.id,
-            ...doc.data()
-          } as UserData);
-          seenIds.add(doc.id);
-        }
-      });
-      
-      // If no results, try searching all users and filter client-side
-      if (results.length === 0) {
-        const allUsersQuery = query(usersRef);
-        const allUsersSnapshot = await getDocs(allUsersQuery);
+      allUsersSnapshot.forEach((doc) => {
+        if (doc.id === user.uid) return; // Skip current user
         
-        allUsersSnapshot.forEach((doc) => {
-          const userData = doc.data() as UserData;
-          if (doc.id !== user.uid && 
-              userData.username && 
-              userData.username.toLowerCase().includes(searchQuery.toLowerCase())) {
-            results.push({
-              id: doc.id,
-              ...userData
-            });
-          }
-        });
-      }
+        const userData = doc.data() as UserData;
+        if (!userData.username) return; // Skip users without username
+        
+        // Case-insensitive search
+        const username = userData.username.toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
+        
+        // Exact match or partial match
+        if (username === query || username.includes(query)) {
+          results.push({
+            id: doc.id,
+            ...userData
+          });
+        }
+      });
+      
+      // Sort results: exact matches first, then partial matches
+      results.sort((a, b) => {
+        const aUsername = a.username.toLowerCase();
+        const bUsername = b.username.toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
+        
+        const aExact = aUsername === query ? 1 : 0;
+        const bExact = bUsername === query ? 1 : 0;
+        
+        if (aExact !== bExact) {
+          return bExact - aExact; // Exact matches first
+        }
+        
+        // Then by username alphabetically
+        return aUsername.localeCompare(bUsername);
+      });
       
       setSearchResults(results);
+      
+      if (results.length === 0) {
+        setSearchError(`No users found with username containing "${searchQuery}"`);
+      }
     } catch (error) {
       console.error('Error searching users:', error);
+      setSearchError('Error searching for users. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -139,21 +126,27 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
       const userRef = doc(db, 'users', user.uid);
       const friendRef = doc(db, 'users', friendId);
       
+      // Add friend to current user's friends list
       await updateDoc(userRef, {
         friends: arrayUnion(friendId)
       });
       
+      // Add current user to friend's friends list
       await updateDoc(friendRef, {
         friends: arrayUnion(user.uid)
       });
       
       // Refresh friends list
-      loadFriends();
+      await loadFriends();
       
       // Remove from search results
       setSearchResults(prev => prev.filter(u => u.id !== friendId));
+      
+      // Show success message
+      setSearchError('');
     } catch (error) {
       console.error('Error adding friend:', error);
+      setSearchError('Error adding friend. Please try again.');
     }
   };
 
@@ -217,7 +210,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <input
                     type="text"
-                    placeholder="Search by username..."
+                    placeholder="Search by username (e.g., john123, mary_k, etc.)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
@@ -232,6 +225,23 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                   {loading ? 'Searching...' : 'Search'}
                 </button>
               </div>
+
+              {/* Search Tips */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="font-semibold text-blue-800 mb-1">Search Tips:</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Enter the exact username or part of it</li>
+                  <li>• Search is case-insensitive</li>
+                  <li>• Try different variations if you can't find someone</li>
+                </ul>
+              </div>
+
+              {/* Error Message */}
+              {searchError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                  {searchError}
+                </div>
+              )}
 
               <div className="max-h-64 overflow-y-auto space-y-2">
                 {searchResults.map((user) => (
@@ -261,17 +271,18 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                     )}
                   </div>
                 ))}
-                {searchResults.length === 0 && searchQuery && !loading && (
+                {searchResults.length === 0 && searchQuery && !loading && !searchError && (
                   <div className="text-center py-8 text-gray-500">
                     <Users size={48} className="mx-auto mb-4 text-gray-300" />
                     <p>No users found with username "{searchQuery}"</p>
-                    <p className="text-sm mt-2">Try searching with the exact username</p>
+                    <p className="text-sm mt-2">Try searching with different keywords</p>
                   </div>
                 )}
                 {!searchQuery && (
                   <div className="text-center py-8 text-gray-500">
                     <Search size={48} className="mx-auto mb-4 text-gray-300" />
                     <p>Enter a username to search for friends</p>
+                    <p className="text-sm mt-2">You can search for exact usernames or partial matches</p>
                   </div>
                 )}
               </div>
