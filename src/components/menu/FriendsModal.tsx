@@ -353,6 +353,10 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       
       await loadChallenges();
       setIsOffline(false);
+      
+      // Show success message
+      setError('');
+      // You could add a success state here if needed
     } catch (error: any) {
       handleFirebaseError(error, 'sending challenge');
     }
@@ -629,9 +633,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
           {activeTab === 'challenges' && (
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {challenges.map((challenge) => (
-                <div key={challenge.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+                <div key={challenge.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border-l-4 border-orange-500">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-orange-500 p-2 rounded-full">
+                    <div className="bg-orange-500 p-2 rounded-full animate-pulse">
                       <Gamepad2 className="text-white" size={16} />
                     </div>
                     <div>
@@ -646,10 +650,10 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'accepted', challenge)}
                       disabled={isOffline}
-                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 animate-pulse"
                     >
                       <Check size={16} />
-                      <span>Accept</span>
+                      <span>Accept & Play</span>
                     </button>
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'rejected', challenge)}

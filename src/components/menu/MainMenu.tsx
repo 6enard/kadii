@@ -5,6 +5,7 @@ import { auth } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthModal } from '../auth/AuthModal';
 import { FriendsModal } from './FriendsModal';
+import { ChallengeNotification } from './ChallengeNotification';
 
 interface MainMenuProps {
   onStartSinglePlayer: () => void;
@@ -40,6 +41,11 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-900 flex items-center justify-center p-4">
+      {/* Challenge Notifications */}
+      {user && onStartChallengeGame && (
+        <ChallengeNotification onStartChallenge={handleStartChallenge} />
+      )}
+
       <div className="w-full max-w-4xl">
         {/* Header */}
         <div className="text-center mb-12">
