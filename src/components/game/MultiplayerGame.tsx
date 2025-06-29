@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { GameState, Suit } from '../../types';
 import { 
   initializeGame, 
@@ -17,24 +17,14 @@ import { SuitSelector } from '../SuitSelector';
 import { GameStatus } from '../GameStatus';
 import { ArrowLeft, Users } from 'lucide-react';
 
-interface ChallengeInfo {
-  opponentId: string;
-  opponentName: string;
-}
-
 interface MultiplayerGameProps {
   onBackToMenu: () => void;
-  challengeInfo?: ChallengeInfo | null;
 }
 
-export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu, challengeInfo }) => {
+export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }) => {
   const [gameState, setGameState] = useState<GameState>(() => {
     const game = initializeGame();
-    if (challengeInfo) {
-      game.players[1].name = challengeInfo.opponentName;
-    } else {
-      game.players[1].name = 'Player 2';
-    }
+    game.players[1].name = 'Player 2';
     return game;
   });
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
@@ -93,14 +83,10 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu, 
   
   const handleNewGame = useCallback(() => {
     const game = initializeGame();
-    if (challengeInfo) {
-      game.players[1].name = challengeInfo.opponentName;
-    } else {
-      game.players[1].name = 'Player 2';
-    }
+    game.players[1].name = 'Player 2';
     setGameState(game);
     setSelectedCards([]);
-  }, [challengeInfo]);
+  }, []);
   
   const handleDrawPenalty = useCallback(() => {
     if (!isMyTurn) return;
@@ -127,12 +113,8 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu, 
             <span>Back</span>
           </button>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">
-              {challengeInfo ? 'Challenge Match' : 'Multiplayer Kadi'}
-            </h1>
-            <p className="text-red-200 text-sm">
-              {challengeInfo ? `Playing against ${challengeInfo.opponentName}` : 'Playing with a friend'}
-            </p>
+            <h1 className="text-2xl font-bold text-white">Local Multiplayer</h1>
+            <p className="text-red-200 text-sm">Pass and play with a friend</p>
           </div>
           <div className="w-16"></div>
         </div>
@@ -141,7 +123,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu, 
       {/* Main Game Area - Scrollable */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Opponent (Player 2) - CRYSTAL CLEAR Coat of Arms */}
+          {/* Player 2 - CRYSTAL CLEAR Coat of Arms */}
           <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
             <div className="flex items-center justify-between mb-2">
               <h3 className={`font-bold flex items-center space-x-2 ${gameState.currentPlayerIndex === 1 ? 'text-red-400' : 'text-gray-300'}`}>
