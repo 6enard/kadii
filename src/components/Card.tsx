@@ -28,12 +28,12 @@ export const Card: React.FC<CardProps> = ({
   
   const getCategoryGradient = () => {
     switch (category) {
-      case 'penalty': return 'bg-gradient-to-br from-white to-red-50 border-red-400';
-      case 'jump': return 'bg-gradient-to-br from-white to-red-50 border-red-500';
-      case 'kickback': return 'bg-gradient-to-br from-white to-red-50 border-red-600';
-      case 'question': return 'bg-gradient-to-br from-white to-red-50 border-red-700';
-      case 'wild': return 'bg-gradient-to-br from-white to-red-50 border-red-800';
-      default: return 'bg-gradient-to-br from-white to-gray-50 border-red-300';
+      case 'penalty': return 'bg-white border-red-400';
+      case 'jump': return 'bg-white border-red-500';
+      case 'kickback': return 'bg-white border-red-600';
+      case 'question': return 'bg-white border-red-700';
+      case 'wild': return 'bg-white border-red-800';
+      default: return 'bg-white border-gray-300';
     }
   };
   
@@ -51,9 +51,9 @@ export const Card: React.FC<CardProps> = ({
       onClick={onClick}
     >
       {/* Top corner - MUCH LARGER AND CLEARER */}
-      <div className={`${suitColor} text-center leading-none p-1 bg-white bg-opacity-90 rounded-tl-xl rounded-br-lg`}>
-        <div className="font-black text-lg drop-shadow-sm">{card.rank}</div>
-        <div className="text-xl drop-shadow-sm">{SUIT_SYMBOLS[card.suit]}</div>
+      <div className={`${suitColor} text-center leading-none p-1 bg-white rounded-tl-xl rounded-br-lg`}>
+        <div className="font-black text-lg">{card.rank}</div>
+        <div className="text-xl">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Center - Kenyan Coat of Arms with PROMINENT suit symbol */}
@@ -68,15 +68,15 @@ export const Card: React.FC<CardProps> = ({
         </div>
         
         {/* PROMINENT suit symbol in center */}
-        <div className={`${suitColor} text-3xl font-black z-10 drop-shadow-lg bg-white bg-opacity-80 rounded-full w-12 h-12 flex items-center justify-center`}>
+        <div className={`${suitColor} text-3xl font-black z-10 bg-white rounded-full w-12 h-12 flex items-center justify-center`}>
           {SUIT_SYMBOLS[card.suit]}
         </div>
       </div>
       
       {/* Bottom corner (rotated) - MUCH LARGER AND CLEARER */}
-      <div className={`${suitColor} rotate-180 text-center leading-none p-1 bg-white bg-opacity-90 rounded-br-xl rounded-tl-lg`}>
-        <div className="font-black text-lg drop-shadow-sm">{card.rank}</div>
-        <div className="text-xl drop-shadow-sm">{SUIT_SYMBOLS[card.suit]}</div>
+      <div className={`${suitColor} rotate-180 text-center leading-none p-1 bg-white rounded-br-xl rounded-tl-lg`}>
+        <div className="font-black text-lg">{card.rank}</div>
+        <div className="text-xl">{SUIT_SYMBOLS[card.suit]}</div>
       </div>
       
       {/* Special card indicator */}
