@@ -175,7 +175,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden shadow-xl"
+                  className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden"
                 >
                   {/* CRYSTAL CLEAR HIGH-QUALITY Kenyan Coat of Arms */}
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -262,7 +262,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       {/* Difficulty Modal */}
       {showDifficultyModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-xl max-w-md w-full">
             <div className="bg-gradient-to-r from-red-500 to-red-600 p-4 text-white rounded-t-xl">
               <h3 className="text-xl font-bold">Select Difficulty</h3>
             </div>

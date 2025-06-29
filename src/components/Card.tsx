@@ -28,12 +28,12 @@ export const Card: React.FC<CardProps> = ({
   
   const getCategoryGradient = () => {
     switch (category) {
-      case 'penalty': return 'bg-gradient-to-br from-white to-red-50 border-red-400 shadow-red-200';
-      case 'jump': return 'bg-gradient-to-br from-white to-red-50 border-red-500 shadow-red-300';
-      case 'kickback': return 'bg-gradient-to-br from-white to-red-50 border-red-600 shadow-red-400';
-      case 'question': return 'bg-gradient-to-br from-white to-red-50 border-red-700 shadow-red-500';
-      case 'wild': return 'bg-gradient-to-br from-white to-red-50 border-red-800 shadow-red-600';
-      default: return 'bg-gradient-to-br from-white to-gray-50 border-red-300 shadow-red-200';
+      case 'penalty': return 'bg-gradient-to-br from-white to-red-50 border-red-400';
+      case 'jump': return 'bg-gradient-to-br from-white to-red-50 border-red-500';
+      case 'kickback': return 'bg-gradient-to-br from-white to-red-50 border-red-600';
+      case 'question': return 'bg-gradient-to-br from-white to-red-50 border-red-700';
+      case 'wild': return 'bg-gradient-to-br from-white to-red-50 border-red-800';
+      default: return 'bg-gradient-to-br from-white to-gray-50 border-red-300';
     }
   };
   
@@ -42,12 +42,11 @@ export const Card: React.FC<CardProps> = ({
       className={`
         ${sizeClasses[size]}
         rounded-xl border-2 flex flex-col relative
-        cursor-pointer transition-all duration-300 shadow-lg
+        cursor-pointer transition-all duration-300
         ${getCategoryGradient()}
-        ${isSelected ? 'ring-4 ring-yellow-400 transform -translate-y-3 scale-110 shadow-2xl' : ''}
-        ${isPlayable ? 'hover:transform hover:-translate-y-2 hover:shadow-xl hover:scale-105' : ''}
+        ${isSelected ? 'ring-4 ring-yellow-400 transform -translate-y-3 scale-110' : ''}
+        ${isPlayable ? 'hover:transform hover:-translate-y-2 hover:scale-105' : ''}
         ${!isPlayable && onClick ? 'opacity-50 cursor-not-allowed' : ''}
-        backdrop-blur-sm
       `}
       onClick={onClick}
     >

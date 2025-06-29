@@ -142,7 +142,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden shadow-xl"
+                  className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden"
                 >
                   {/* CRYSTAL CLEAR HIGH-QUALITY Kenyan Coat of Arms */}
                   <div className="absolute inset-0 flex items-center justify-center">
