@@ -75,21 +75,7 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
       }, (error) => {
         console.error('Error listening to challenges:', error);
         
-        // Handle the specific "Target ID already exists" error
-        if (error.code === 'already-exists') {
-          console.warn('Firestore listener collision in ChallengeNotification, retrying...');
-          // Clean up and retry after a short delay
-          setTimeout(() => {
-            if (unsubscribeRef.current) {
-              unsubscribeRef.current();
-              unsubscribeRef.current = null;
-            }
-            // The useEffect will run again and recreate the listener
-          }, 1000);
-          return;
-        }
-        
-        // For other errors, reset state
+        // For any errors, reset state
         setAcceptedChallenges([]);
         setShowNotification(false);
       });

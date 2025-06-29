@@ -145,18 +145,23 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         handleFirebaseError(error, 'loading friend requests');
       });
 
-      // Set up sent requests listener
+      // Set up sent requests listener - Remove orderBy to avoid index requirement
       const sentRequestsQuery = query(
         collection(db, 'friendRequests'),
         where('fromUserId', '==', user.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
+        where('status', '==', 'pending')
       );
 
       sentRequestsUnsubscribeRef.current = onSnapshot(sentRequestsQuery, (snapshot) => {
         const sent: FriendRequest[] = [];
         snapshot.forEach((doc) => {
           sent.push({ id: doc.id, ...doc.data() } as FriendRequest);
+        });
+        // Sort in memory instead of using orderBy
+        sent.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime.getTime() - aTime.getTime();
         });
         setSentRequests(sent);
         setIsOffline(false);
@@ -181,17 +186,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       setError(`Access denied. Please make sure you're logged in and try again.`);
     } else if (error.code === 'not-found') {
       setError(`Data not found. The requested information may have been removed.`);
-    } else if (error.code === 'already-exists') {
-      // Handle the specific "Target ID already exists" error
-      console.warn('Firestore listener collision detected, retrying...');
-      // Clean up and retry after a short delay
-      setTimeout(() => {
-        cleanupListeners();
-        if (isOpen && user) {
-          setupRealtimeListeners();
-        }
-      }, 1000);
-      return; // Don't show error to user for this case
     } else {
       setError(`Error ${operation}. Please try again later.`);
     }
