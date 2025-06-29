@@ -126,7 +126,7 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
             <X size={16} />
           </button>
           <div className="flex items-center space-x-2">
-            <Gamepad2 size={20} className="animate-pulse" />
+            <Gamepad2 size={20} className="animate-pulse" id="notification-header-icon" />
             <h3 className="font-bold">Challenge Accepted!</h3>
           </div>
           <p className="text-green-100 text-sm mt-1">
@@ -155,7 +155,7 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
                   onClick={() => handleStartGame(challenge)}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-1"
                 >
-                  <Gamepad2 size={14} />
+                  <Gamepad2 size={14} id={`notification-start-${challenge.id}`} />
                   <span>Start Game</span>
                 </button>
                 <button

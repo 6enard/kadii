@@ -487,7 +487,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              <Gamepad2 size={16} className="inline mr-2" />
+              <Gamepad2 size={16} className="inline mr-2" id="tab-challenges-icon" />
               Challenges ({challenges.length})
             </button>
             <button
@@ -575,7 +575,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                       disabled={isOffline}
                       className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Gamepad2 size={16} />
+                      <Gamepad2 size={16} id={`challenge-friend-${friend.id}`} />
                       <span>Challenge</span>
                     </button>
                     <button
@@ -679,7 +679,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                 <div key={challenge.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border-l-4 border-orange-500">
                   <div className="flex items-center space-x-3">
                     <div className="bg-orange-500 p-2 rounded-full animate-pulse">
-                      <Gamepad2 className="text-white" size={16} />
+                      <Gamepad2 className="text-white" size={16} id={`challenge-list-${challenge.id}`} />
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-800">{challenge.fromUsername}</h4>
@@ -711,7 +711,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
               ))}
               {challenges.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <Gamepad2 size={48} className="mx-auto mb-4 text-gray-300" />
+                  <Gamepad2 size={48} className="mx-auto mb-4 text-gray-300" id="no-challenges-icon" />
                   <p>No pending challenges</p>
                   <p className="text-sm mt-2">Challenge your friends to start playing!</p>
                 </div>
