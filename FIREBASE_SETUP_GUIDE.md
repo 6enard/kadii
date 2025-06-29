@@ -1,76 +1,47 @@
 # Complete Firebase Setup Guide for Kadi Card Game
 
-## Step 1: Firebase Authentication Setup
+## Current Issue
+You have a Firestore document but no corresponding user in Firebase Authentication. This means the document was created manually. Let's fix this and ensure proper automatic registration.
 
-### 1.1 Enable Authentication
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Select your project: **kadii-171f7**
-3. Click **Authentication** in the left sidebar
-4. Click **Get started** if not already enabled
-5. Go to **Sign-in method** tab
+## Step 1: Clean Up Current Data
 
-### 1.2 Configure Email/Password Authentication
+### 1.1 Delete the Manual Document
+1. Go to [Firebase Console](https://console.firebase.google.com) → Your Project → Firestore Database
+2. Find the `users` collection
+3. Delete the document you created manually (the one with test@gmail.com)
+4. This ensures we start fresh with proper automatic registration
+
+## Step 2: Firebase Authentication Setup
+
+### 2.1 Enable Authentication
+1. Go to Firebase Console → Authentication
+2. Click **Get started** if not already enabled
+3. Go to **Sign-in method** tab
+
+### 2.2 Configure Email/Password Authentication
 1. Click on **Email/Password** provider
 2. **Enable** the first option (Email/Password)
 3. **DISABLE** the second option (Email link - passwordless sign-in)
 4. Click **Save**
 
-### 1.3 Authentication Settings
+### 2.3 Authentication Settings (Important!)
 1. Go to **Settings** tab in Authentication
 2. Under **User actions**:
-   - **DISABLE** "Email enumeration protection" (for easier development)
+   - **DISABLE** "Email enumeration protection" (this prevents the "user not found" errors during development)
 3. Under **Authorized domains**:
-   - Make sure your domain is listed (should include localhost for development)
+   - Make sure `localhost` is listed for development
+   - Add your production domain when you deploy
 
-## Step 2: Firestore Database Setup
+## Step 3: Firestore Database Setup
 
-### 2.1 Create Firestore Database
-1. Click **Firestore Database** in the left sidebar
-2. Click **Create database**
-3. Choose **Start in test mode** (we'll secure it later)
-4. Select your preferred location (choose closest to your users)
-5. Click **Done**
+### 3.1 Verify Database Exists
+1. Go to Firestore Database in Firebase Console
+2. If not created, click **Create database** → **Start in test mode**
+3. Choose your preferred location
 
-### 2.2 Create the Users Collection
-
-#### Method 1: Automatic Creation (Recommended)
-The app will automatically create user documents when users sign up. Just make sure the structure is correct by creating one test document:
-
-1. Click **Start collection**
-2. Collection ID: `users`
-3. Document ID: Click **Auto-ID**
-4. Add these fields:
-
-| Field Name | Type | Value |
-|------------|------|-------|
-| username | string | "testuser" |
-| email | string | "test@example.com" |
-| createdAt | timestamp | *Click timestamp icon → Current date/time* |
-| gamesPlayed | number | 0 |
-| gamesWon | number | 0 |
-| friends | array | *Leave empty (no items)* |
-
-5. Click **Save**
-
-#### Method 2: Manual Structure Setup
-If you prefer to set up the structure manually:
-
-```javascript
-// Document structure for users collection
-{
-  username: "string",      // User's display name
-  email: "string",         // User's email address
-  createdAt: "timestamp",  // Account creation date
-  gamesPlayed: "number",   // Total games played (default: 0)
-  gamesWon: "number",      // Total games won (default: 0)
-  friends: "array"         // Array of friend UIDs (default: empty)
-}
-```
-
-### 2.3 Set Up Security Rules (Important!)
-
+### 3.2 Set Up Security Rules
 1. Go to **Rules** tab in Firestore
-2. Replace the default rules with these secure rules:
+2. Replace with these rules:
 
 ```javascript
 rules_version = '2';
@@ -84,11 +55,6 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
     
-    // Game rooms (for future multiplayer functionality)
-    match /gameRooms/{roomId} {
-      allow read, write: if request.auth != null;
-    }
-    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
@@ -99,32 +65,70 @@ service cloud.firestore {
 
 3. Click **Publish**
 
-## Step 3: Test the Setup
+## Step 4: Test the Complete Flow
 
-### 3.1 Test User Registration
+### 4.1 Test User Registration
 1. Run your app: `npm run dev`
 2. Click **Sign In / Sign Up**
-3. Create a new account with:
+3. Switch to **Sign Up** mode
+4. Create a new account with:
    - Username: "testplayer"
    - Email: "test@example.com"
    - Password: "password123"
 
-### 3.2 Verify Database Creation
-1. Go back to Firestore Console
-2. Check the **users** collection
-3. You should see a new document with the user's UID as the document ID
-4. Verify all fields are populated correctly
+### 4.2 Verify Both Systems
+After successful registration, check:
 
-### 3.3 Test Friends Feature
-1. Create a second test account
-2. Try searching for users in the Friends modal
-3. Add the first user as a friend
-4. Verify the friends array is updated in both user documents
+**Firebase Authentication:**
+1. Go to Authentication → Users
+2. You should see the new user with the email you used
+3. Note the User UID (this will be the document ID in Firestore)
 
-## Step 4: Production Considerations
+**Firestore Database:**
+1. Go to Firestore Database → Data
+2. You should see a `users` collection
+3. Inside, a document with the User UID as the document ID
+4. The document should contain:
+   ```
+   username: "testplayer"
+   email: "test@example.com"
+   createdAt: [current timestamp]
+   gamesPlayed: 0
+   gamesWon: 0
+   friends: [] (empty array)
+   ```
 
-### 4.1 Security Rules (Production Ready)
-For production, use these more restrictive rules:
+## Step 5: Test Friends Feature
+
+### 5.1 Create a Second User
+1. Sign out from the first account
+2. Create another test account
+3. Verify it appears in both Authentication and Firestore
+
+### 5.2 Test Friend Search
+1. Sign in with the first account
+2. Click **Find Friends**
+3. You should see the second user in the search results
+4. Try adding them as a friend
+
+## Step 6: Troubleshooting Common Issues
+
+### Issue: "User not found" during sign-in
+**Solution:** Make sure "Email enumeration protection" is DISABLED in Authentication Settings
+
+### Issue: "Permission denied" in Firestore
+**Solution:** Check your security rules are set correctly (Step 3.2)
+
+### Issue: User created in Auth but not in Firestore
+**Solution:** Check browser console for errors. The AuthModal component should handle this automatically.
+
+### Issue: Friends search shows no results
+**Solution:** Make sure users have `username` field populated and security rules allow reading other users' data
+
+## Step 7: Production Considerations
+
+### 7.1 Security Rules for Production
+For production, use more restrictive rules:
 
 ```javascript
 rules_version = '2';
@@ -134,7 +138,7 @@ service cloud.firestore {
       // Users can only read/write their own document
       allow read, write: if request.auth != null && request.auth.uid == userId;
       
-      // Allow reading public user info for friends (limited fields)
+      // Allow reading limited public user info for friends
       allow read: if request.auth != null && 
         resource.data.keys().hasAll(['username', 'gamesPlayed', 'gamesWon']);
     }
@@ -142,78 +146,31 @@ service cloud.firestore {
 }
 ```
 
-### 4.2 Indexes (if needed)
-If you experience slow queries, create these indexes:
-1. Go to **Indexes** tab in Firestore
-2. Create composite index for:
-   - Collection: `users`
-   - Fields: `username` (Ascending)
+### 7.2 Enable Email Enumeration Protection
+In production, re-enable "Email enumeration protection" for better security.
 
-### 4.3 Backup Strategy
-1. Go to **Backups** tab
-2. Set up automatic backups for your database
+## Expected Document Structure
 
-## Step 5: Environment Variables
+When a user registers, this is what should be automatically created:
 
-Your current Firebase config in `src/firebase/config.ts` is correct:
-
-```typescript
-const firebaseConfig = {
-  apiKey: "AIzaSyC5wi6x-V1LfZW90Ch5KH5pVnSyaLdNOFw",
-  authDomain: "kadii-171f7.firebaseapp.com",
-  projectId: "kadii-171f7",
-  storageBucket: "kadii-171f7.firebasestorage.app",
-  messagingSenderId: "261075441082",
-  appId: "1:261075441082:web:9960496d0815757dfef983",
-  measurementId: "G-M29H6YL64F"
-};
+```javascript
+// Document ID: Firebase Auth User UID (e.g., "abc123def456")
+{
+  username: "string",      // User's chosen username
+  email: "string",         // User's email (lowercase, trimmed)
+  createdAt: "timestamp",  // Account creation date
+  gamesPlayed: 0,          // Total games played (number)
+  gamesWon: 0,             // Total games won (number)
+  friends: []              // Array of friend UIDs (empty initially)
+}
 ```
 
-## Step 6: Troubleshooting
+## Key Points:
+- ✅ **Document ID = Firebase Auth UID** (automatic linking)
+- ✅ **No manual document creation needed**
+- ✅ **Registration creates both Auth user AND Firestore document**
+- ✅ **Friends array starts empty, not with empty string**
+- ✅ **Username validation (3-20 characters)**
+- ✅ **Email validation and normalization**
 
-### Common Issues:
-
-1. **"Permission denied" errors**
-   - Check your Firestore security rules
-   - Ensure user is authenticated
-   - Verify document structure matches rules
-
-2. **Users not found in search**
-   - Check if user documents are being created properly
-   - Verify the username field exists and is populated
-   - Check network connectivity
-
-3. **Friends not being added**
-   - Verify both users exist in the database
-   - Check if the friends array field exists
-   - Ensure proper permissions in security rules
-
-4. **Authentication errors**
-   - Verify Email/Password is enabled in Firebase Console
-   - Check if email enumeration protection is disabled for development
-   - Ensure authorized domains include your development URL
-
-## Step 7: Monitoring and Analytics
-
-1. **Authentication Monitoring**
-   - Go to Authentication → Users to see registered users
-   - Monitor sign-in methods and user activity
-
-2. **Database Monitoring**
-   - Go to Firestore → Usage to monitor reads/writes
-   - Check for any security rule violations
-
-3. **Error Monitoring**
-   - Check the Firebase Console for any errors
-   - Monitor the browser console for client-side errors
-
-## Next Steps
-
-Once this setup is complete, your app will:
-- ✅ Allow users to register and sign in
-- ✅ Automatically create user profiles in Firestore
-- ✅ Enable the friends search and add functionality
-- ✅ Secure user data with proper access controls
-- ✅ Support future multiplayer features
-
-The app is designed to handle all user management automatically - you just need to set up the Firebase services as described above!
+The app will now automatically handle user registration and create the proper database structure!

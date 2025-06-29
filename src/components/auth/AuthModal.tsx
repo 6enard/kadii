@@ -33,27 +33,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (isLogin) {
+        // Sign in existing user
         await signInWithEmailAndPassword(auth, email, password);
+        console.log('User signed in successfully');
       } else {
+        // Create new user account
+        console.log('Creating new user account...');
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCredential.user, { displayName: username });
+        console.log('User account created:', userCredential.user.uid);
         
-        // Create user document in Firestore
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          username,
-          email,
+        // Update the user's display name
+        await updateProfile(userCredential.user, { displayName: username });
+        console.log('Display name updated');
+        
+        // Create user document in Firestore with the user's UID as document ID
+        const userDocRef = doc(db, 'users', userCredential.user.uid);
+        const userData = {
+          username: username.trim(),
+          email: email.toLowerCase().trim(),
           createdAt: new Date(),
           gamesPlayed: 0,
           gamesWon: 0,
-          friends: []
-        });
+          friends: [] // Empty array, not array with empty string
+        };
+        
+        console.log('Creating Firestore document with data:', userData);
+        await setDoc(userDocRef, userData);
+        console.log('User document created in Firestore');
       }
       
       // Reset form and close modal on success
       resetForm();
       onClose();
     } catch (error: any) {
-      setError(error.message);
+      console.error('Authentication error:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = error.message;
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please sign in instead.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters long.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email. Please sign up first.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -100,6 +132,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 required
+                minLength={3}
+                maxLength={20}
               />
             </div>
           )}
@@ -125,6 +159,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
               required
+              minLength={6}
             />
             <button
               type="button"
