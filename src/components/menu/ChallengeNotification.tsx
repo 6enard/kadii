@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Gamepad2, Clock } from 'lucide-react';
 import { 
   collection, 
@@ -22,15 +22,19 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
   const [acceptedChallenges, setAcceptedChallenges] = useState<GameChallenge[]>([]);
   const [showNotification, setShowNotification] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-
-    // Listen for challenges that have been accepted where current user is the challenger
-    const challengesQuery = query(
+  // Memoize the query to prevent recreating it on every render
+  const challengesQuery = useMemo(() => {
+    if (!user) return null;
+    
+    return query(
       collection(db, 'challenges'),
       where('fromUserId', '==', user.uid),
       where('status', '==', 'accepted')
     );
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!challengesQuery) return;
 
     const unsubscribe = onSnapshot(challengesQuery, (snapshot) => {
       const accepted: GameChallenge[] = [];
@@ -55,7 +59,7 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [challengesQuery]);
 
   const handleStartGame = async (challenge: GameChallenge) => {
     try {
