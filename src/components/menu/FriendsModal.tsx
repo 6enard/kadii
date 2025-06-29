@@ -21,6 +21,7 @@ import {
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserData, FriendRequest, GameChallenge } from '../../types';
+import { ClearChallengesButton } from './ClearChallengesButton';
 
 interface FriendsModalProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [challenges, setChallenges] = useState<GameChallenge[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges'>('friends');
+  const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges' | 'admin'>('friends');
   const [error, setError] = useState('');
   const [isOffline, setIsOffline] = useState(false);
 
@@ -411,6 +412,12 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
     }
   };
 
+  const handleClearComplete = () => {
+    // Refresh challenges after clearing
+    loadChallenges();
+    setError('');
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -494,6 +501,17 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
               <Search size={16} className="inline mr-2" />
               Browse ({filteredUsers.length})
             </button>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                activeTab === 'admin'
+                  ? 'bg-white text-red-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Trash2 size={16} className="inline mr-2" />
+              Admin
+            </button>
           </div>
 
           {/* Error Message */}
@@ -506,6 +524,31 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
               <div className="flex items-center space-x-2">
                 {isOffline ? <WifiOff size={16} /> : null}
                 <span>{error}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Tab */}
+          {activeTab === 'admin' && (
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <h4 className="font-semibold text-red-800 mb-2">⚠️ Admin Actions</h4>
+                <p className="text-sm text-red-700 mb-4">
+                  These actions will permanently delete data from the system. Use with caution.
+                </p>
+                
+                <ClearChallengesButton onClearComplete={handleClearComplete} />
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-800 mb-2">ℹ️ System Information</h4>
+                <div className="text-sm text-blue-700 space-y-1">
+                  <p>• Total Users: {allUsers.length}</p>
+                  <p>• Your Friends: {friends.length}</p>
+                  <p>• Pending Friend Requests: {friendRequests.length}</p>
+                  <p>• Pending Challenges: {challenges.length}</p>
+                  <p>• Connection Status: {isOffline ? 'Offline' : 'Online'}</p>
+                </div>
               </div>
             </div>
           )}
