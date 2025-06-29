@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, UserPlus, Users, MessageCircle, RefreshCw } from 'lucide-react';
-import { collection, query, getDocs, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { collection, query, getDocs, doc, updateDoc, arrayUnion, getDoc, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,6 +26,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'friends'>('browse');
   const [error, setError] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -46,13 +47,32 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
     }
   }, [searchQuery, allUsers]);
 
+  const handleFirebaseError = (error: any, operation: string) => {
+    console.error(`Error ${operation}:`, error);
+    
+    if (error.code === 'unavailable' || error.message?.includes('offline') || error.message?.includes('network')) {
+      setIsOffline(true);
+      setError(`Unable to connect to the server. Please check your internet connection and try again.`);
+    } else if (error.code === 'permission-denied') {
+      setError(`Access denied. Please make sure you're logged in and try again.`);
+    } else if (error.code === 'not-found') {
+      setError(`Data not found. The requested information may have been removed.`);
+    } else {
+      setError(`Error ${operation}. Please try again later.`);
+    }
+  };
+
   const loadAllUsers = async () => {
     if (!user) return;
 
     setLoading(true);
     setError('');
+    setIsOffline(false);
     
     try {
+      // Try to enable network in case it was disabled
+      await enableNetwork(db);
+      
       const usersRef = collection(db, 'users');
       const allUsersSnapshot = await getDocs(usersRef);
       const users: UserData[] = [];
@@ -74,9 +94,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
       
       setAllUsers(users);
       setFilteredUsers(users);
-    } catch (error) {
-      console.error('Error loading users:', error);
-      setError('Error loading users. Please try again.');
+      setIsOffline(false);
+    } catch (error: any) {
+      handleFirebaseError(error, 'loading users');
     } finally {
       setLoading(false);
     }
@@ -86,6 +106,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
     if (!user) return;
 
     try {
+      // Try to enable network in case it was disabled
+      await enableNetwork(db);
+      
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.data();
       
@@ -104,8 +127,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
         friendsData.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
         setFriends(friendsData);
       }
-    } catch (error) {
-      console.error('Error loading friends:', error);
+      setIsOffline(false);
+    } catch (error: any) {
+      handleFirebaseError(error, 'loading friends');
     }
   };
 
@@ -113,6 +137,11 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
     if (!user) return;
 
     try {
+      setError('');
+      
+      // Try to enable network in case it was disabled
+      await enableNetwork(db);
+      
       const userRef = doc(db, 'users', user.uid);
       const friendRef = doc(db, 'users', friendId);
       
@@ -129,10 +158,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
       // Refresh friends list
       await loadFriends();
       
-      setError('');
-    } catch (error) {
-      console.error('Error adding friend:', error);
-      setError('Error adding friend. Please try again.');
+      setIsOffline(false);
+    } catch (error: any) {
+      handleFirebaseError(error, 'adding friend');
     }
   };
 
@@ -140,9 +168,39 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
     return friends.some(friend => friend.id === userId);
   };
 
-  const handleRefresh = () => {
-    loadAllUsers();
-    loadFriends();
+  const handleRefresh = async () => {
+    setError('');
+    setIsOffline(false);
+    
+    try {
+      // Force enable network
+      await enableNetwork(db);
+      await loadAllUsers();
+      await loadFriends();
+    } catch (error: any) {
+      handleFirebaseError(error, 'refreshing data');
+    }
+  };
+
+  const retryConnection = async () => {
+    setError('');
+    setIsOffline(false);
+    setLoading(true);
+    
+    try {
+      // Force enable network
+      await enableNetwork(db);
+      
+      // Wait a moment for connection to establish
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      await loadAllUsers();
+      await loadFriends();
+    } catch (error: any) {
+      handleFirebaseError(error, 'retrying connection');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -161,15 +219,33 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
             <div>
               <h2 className="text-2xl font-bold mb-2">Friends & Community</h2>
               <p className="text-purple-100">Connect with other Kadi players</p>
+              {isOffline && (
+                <div className="flex items-center space-x-2 mt-2 text-yellow-200">
+                  <WifiOff size={16} />
+                  <span className="text-sm">Connection issues detected</span>
+                </div>
+              )}
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="flex items-center space-x-2 px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              <span>Refresh</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              {isOffline && (
+                <button
+                  onClick={retryConnection}
+                  disabled={loading}
+                  className="flex items-center space-x-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Wifi size={16} />
+                  <span>Retry</span>
+                </button>
+              )}
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex items-center space-x-2 px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -224,8 +300,24 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
 
               {/* Error Message */}
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                  {error}
+                <div className={`border rounded-lg px-4 py-3 text-sm ${
+                  isOffline 
+                    ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                    : 'bg-red-50 border-red-200 text-red-600'
+                }`}>
+                  <div className="flex items-center space-x-2">
+                    {isOffline ? <WifiOff size={16} /> : null}
+                    <span>{error}</span>
+                  </div>
+                  {isOffline && (
+                    <button
+                      onClick={retryConnection}
+                      disabled={loading}
+                      className="mt-2 px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 transition-colors disabled:opacity-50"
+                    >
+                      Try Again
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -233,7 +325,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
               {loading && (
                 <div className="text-center py-8">
                   <RefreshCw className="animate-spin mx-auto mb-4 text-purple-500" size={32} />
-                  <p className="text-gray-600">Loading all users...</p>
+                  <p className="text-gray-600">
+                    {isOffline ? 'Attempting to reconnect...' : 'Loading all users...'}
+                  </p>
                 </div>
               )}
 
@@ -256,7 +350,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                       {!isFriend(userData.id) && (
                         <button
                           onClick={() => addFriend(userData.id)}
-                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          disabled={isOffline}
+                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <UserPlus size={16} />
                           <span>Add Friend</span>
@@ -279,7 +374,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                     </div>
                   )}
                   
-                  {filteredUsers.length === 0 && !searchQuery && !loading && (
+                  {filteredUsers.length === 0 && !searchQuery && !loading && !isOffline && (
                     <div className="text-center py-8 text-gray-500">
                       <Users size={48} className="mx-auto mb-4 text-gray-300" />
                       <p>No users found</p>
@@ -306,17 +401,27 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                       </p>
                     </div>
                   </div>
-                  <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  <button 
+                    disabled={isOffline}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     <MessageCircle size={16} />
                     <span>Challenge</span>
                   </button>
                 </div>
               ))}
-              {friends.length === 0 && (
+              {friends.length === 0 && !isOffline && (
                 <div className="text-center py-8 text-gray-500">
                   <Users size={48} className="mx-auto mb-4 text-gray-300" />
                   <p>No friends yet</p>
                   <p className="text-sm mt-2">Browse all users to add friends!</p>
+                </div>
+              )}
+              {friends.length === 0 && isOffline && (
+                <div className="text-center py-8 text-gray-500">
+                  <WifiOff size={48} className="mx-auto mb-4 text-gray-300" />
+                  <p>Unable to load friends</p>
+                  <p className="text-sm mt-2">Check your connection and try again</p>
                 </div>
               )}
             </div>
