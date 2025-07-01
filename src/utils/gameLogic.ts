@@ -116,13 +116,16 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   const newState = { ...gameState };
   const currentPlayer = getCurrentPlayer(newState);
   
+  // Add null check for options.cardIds
+  const cardIds = options.cardIds ?? [];
+  
   // Remove cards from player's hand
-  const playedCards = options.cardIds.map(id => 
+  const playedCards = cardIds.map(id => 
     currentPlayer.hand.find(c => c.id === id)!
   ).filter(Boolean);
   
   currentPlayer.hand = currentPlayer.hand.filter(card => 
-    !options.cardIds.includes(card.id)
+    !cardIds.includes(card.id)
   );
   
   // Sort played cards for optimal play order
