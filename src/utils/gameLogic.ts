@@ -71,14 +71,13 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
     });
   }
   
-  // CRITICAL: If there's a pending question, only the person who played it can answer
+  // UPDATED: If there's a pending question, ANY card that can be played normally can answer it
   if (gameState.pendingQuestion) {
-    // Can play answer cards, question cards, or ACES (wild cards can answer questions!)
     if (cards.length === 1) {
       return canAnswerQuestion(cards[0], topCard, gameState.selectedSuit);
     }
     
-    // Question + Answer combo
+    // Question + Answer combo still works
     if (cards.length === 2) {
       return isValidQuestionAnswerCombo(cards) && 
              canPlayCard(cards[0], topCard, gameState.selectedSuit);
@@ -244,7 +243,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   let totalPenalty = 0;
   let hasWild = false;
   let hasJump = false;
-  let hasKickback = false;
+  let kickbackCount = 0;
   let hasQuestion = false;
   
   sortedPlayedCards.forEach(card => {
@@ -260,7 +259,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
         hasJump = true;
         break;
       case 'kickback':
-        hasKickback = true;
+        kickbackCount++;
         break;
       case 'question':
         hasQuestion = true;
@@ -293,7 +292,14 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     }
   }
   
-  if (hasQuestion && !hasWild) {
+  // UPDATED: Any card can answer questions now
+  if (newState.pendingQuestion && !hasWild) {
+    // Any playable card answers the question
+    newState.pendingQuestion = false;
+    newState.turnHistory.push(`${currentPlayer.name} answered the question`);
+  }
+  
+  if (hasQuestion && !hasWild && !newState.pendingQuestion) {
     if (sortedPlayedCards.length === 1 || !sortedPlayedCards.some(card => getCardCategory(card.rank) === 'answer')) {
       // Question card played without answer - same player must answer immediately
       newState.pendingQuestion = true;
@@ -313,20 +319,18 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     newState.turnHistory.push(`${currentPlayer.name} played Jack(s) - plays again!`);
   }
   
-  if (hasKickback) {
-    newState.turnHistory.push(`${currentPlayer.name} played King(s)`);
-  }
-  
-  // Handle answer cards
-  if (newState.pendingQuestion && !hasWild && !hasQuestion) {
-    const hasAnswerCard = sortedPlayedCards.some(card => {
-      const cardCategory = getCardCategory(card.rank);
-      return cardCategory === 'answer' || cardCategory === 'question';
-    });
+  // UPDATED KICKBACK LOGIC: Multiple kickbacks alternate
+  if (kickbackCount > 0) {
+    newState.turnHistory.push(`${currentPlayer.name} played ${kickbackCount} King(s) - kickback effect!`);
     
-    if (hasAnswerCard) {
-      newState.pendingQuestion = false;
-      newState.turnHistory.push(`${currentPlayer.name} answered the question`);
+    // Kickback rule: 1 = next player, 2 = back to self, 3 = next player, 4 = back to self, etc.
+    if (kickbackCount % 2 === 0) {
+      // Even number of kickbacks: comes back to current player
+      skipNextTurn = true;
+      newState.turnHistory.push(`${kickbackCount} kickbacks - turn returns to ${currentPlayer.name}!`);
+    } else {
+      // Odd number of kickbacks: goes to next player (normal turn progression)
+      newState.turnHistory.push(`${kickbackCount} kickbacks - turn goes to next player!`);
     }
   }
   
@@ -361,7 +365,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     newState.turnHistory.push(`${currentPlayer.name}'s Niko Kadi status reset - didn't finish`);
   }
   
-  // Move to next player (unless it's a jump or pending question)
+  // Move to next player (unless it's a jump or pending question or even kickbacks)
   if (!skipNextTurn && !newState.pendingQuestion) {
     nextTurn(newState);
   }
@@ -541,9 +545,9 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
     newState = declareNikoKadi(newState);
   }
   
-  // CRITICAL: If there's a pending question, AI must answer it or draw
+  // UPDATED: If there's a pending question, AI can answer with ANY playable card
   if (newState.pendingQuestion) {
-    // Look for answer cards, question cards, or ACES (wild cards can answer!)
+    // Look for any cards that can answer the question (any playable card now)
     const answerCards = currentPlayer.hand.filter(card => 
       canAnswerQuestion(card, getTopCard(newState), newState.selectedSuit)
     );
