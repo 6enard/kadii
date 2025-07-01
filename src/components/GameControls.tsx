@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameState } from '../types';
 import { getCurrentPlayer } from '../utils/gameLogic';
-import { Play, Plus, AlertTriangle, Target } from 'lucide-react';
+import { Play, Plus, AlertTriangle, Target, Layers } from 'lucide-react';
 
 interface GameControlsProps {
   gameState: GameState;
@@ -23,6 +23,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
   const currentPlayer = getCurrentPlayer(gameState);
   const hasPenalty = gameState.drawStack > 0;
   const isMyTurn = gameState.currentPlayerIndex === 0; // Assuming player 1 is always the human player
+  
+  // Get selected card details for better UI feedback
+  const selectedCardDetails = selectedCards.map(id => 
+    currentPlayer.hand.find(card => card.id === id)
+  ).filter(Boolean);
+  
+  const hasQuestions = selectedCardDetails.some(card => card?.rank === 'Q' || card?.rank === '8');
+  const hasSameRank = selectedCardDetails.length > 1 && 
+    selectedCardDetails.every(card => card?.rank === selectedCardDetails[0]?.rank);
   
   return (
     <div className="space-y-6">
@@ -79,6 +88,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
             <span>
               Play {selectedCards.length > 0 ? `${selectedCards.length} Card${selectedCards.length > 1 ? 's' : ''}` : 'Cards'}
             </span>
+            {hasSameRank && selectedCards.length > 1 && (
+              <Layers size={16} className="text-emerald-300" />
+            )}
           </button>
           
           {/* Draw Penalty Button */}
@@ -99,6 +111,20 @@ export const GameControls: React.FC<GameControlsProps> = ({
             <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
             <span>Selected: {selectedCards.length}/6</span>
           </div>
+          
+          {hasSameRank && selectedCards.length > 1 && (
+            <div className="flex items-center space-x-2 text-emerald-300 font-medium">
+              <Layers size={16} />
+              <span>Stacking {selectedCardDetails[0]?.rank}s</span>
+            </div>
+          )}
+          
+          {hasQuestions && (
+            <div className="flex items-center space-x-2 text-orange-300 font-medium">
+              <AlertTriangle size={16} />
+              <span>Question cards selected</span>
+            </div>
+          )}
           
           {gameState.pendingQuestion && (
             <div className="flex items-center space-x-2 text-orange-300 font-bold animate-pulse">
@@ -121,6 +147,19 @@ export const GameControls: React.FC<GameControlsProps> = ({
             </div>
           )}
         </div>
+        
+        {/* Card Stacking Help */}
+        {selectedCards.length > 1 && (
+          <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <div className="text-blue-300 text-sm">
+              <strong>💡 Card Stacking:</strong>
+              {hasSameRank 
+                ? ` Playing ${selectedCards.length} ${selectedCardDetails[0]?.rank}s together!`
+                : ` Playing ${selectedCards.length} cards in sequence - make sure they can be played in order!`
+              }
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

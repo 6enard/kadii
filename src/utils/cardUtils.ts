@@ -114,8 +114,8 @@ export function isValidQuestionAnswerCombo(cards: Card[]): boolean {
   return true;
 }
 
-// UPDATED: Any card can answer questions now!
+// Updated: Any card that matches suit/rank can answer questions
 export function canAnswerQuestion(card: Card, topCard: Card, selectedSuit: Suit | null): boolean {
-  // ANY card can answer a question if it can be played normally
+  // ANY card can answer a question if it can be played normally (matches suit or rank)
   return canPlayCard(card, topCard, selectedSuit);
 }
