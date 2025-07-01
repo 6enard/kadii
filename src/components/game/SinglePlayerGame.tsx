@@ -16,7 +16,7 @@ import { GameBoard } from '../GameBoard';
 import { GameControls } from '../GameControls';
 import { SuitSelector } from '../SuitSelector';
 import { GameStatus } from '../GameStatus';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft, Settings, Volume2, VolumeX } from 'lucide-react';
 
 interface SinglePlayerGameProps {
   onBackToMenu: () => void;
@@ -31,6 +31,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
   });
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   
   const currentPlayer = getCurrentPlayer(gameState);
   const isComputerTurn = gameState.currentPlayerIndex === 1;
@@ -120,134 +121,152 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     .map(card => card.id) : [];
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-red-800 flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <button
-            onClick={onBackToMenu}
-            className="flex items-center space-x-2 text-white hover:text-red-200 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            <span>Back</span>
-          </button>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">Kadi vs Computer</h1>
-            <p className="text-red-200 text-sm">
-              Difficulty: <span className="capitalize font-semibold">{gameState.aiDifficulty}</span>
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+      {/* Animated background pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, #10b981 0%, transparent 50%), 
+                           radial-gradient(circle at 75% 75%, #3b82f6 0%, transparent 50%)`
+        }}></div>
+      </div>
+
+      {/* Top Navigation Bar */}
+      <div className="relative z-10 bg-black/20 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={onBackToMenu}
+                className="flex items-center space-x-2 text-white/80 hover:text-white transition-colors group"
+              >
+                <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                <span className="font-medium">Back to Menu</span>
+              </button>
+              
+              <div className="h-6 w-px bg-white/20"></div>
+              
+              <div className="text-white">
+                <h1 className="text-lg font-bold">Kadi vs Computer</h1>
+                <p className="text-xs text-white/60">
+                  Difficulty: <span className="capitalize text-emerald-400 font-medium">{gameState.aiDifficulty}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all"
+              >
+                {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              </button>
+              
+              <button
+                onClick={() => setShowDifficultyModal(true)}
+                className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all"
+              >
+                <Settings size={18} />
+                <span className="text-sm font-medium">Settings</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowDifficultyModal(true)}
-            className="flex items-center space-x-2 text-white hover:text-red-200 transition-colors"
-          >
-            <Settings size={20} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 
-      {/* Main Game Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-4 space-y-4">
-          {/* Computer Player - CRYSTAL CLEAR Coat of Arms */}
-          <div className="bg-gray-800 bg-opacity-50 rounded-xl p-3 border border-gray-600">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className={`font-bold ${isComputerTurn ? 'text-red-400' : 'text-gray-300'}`}>
-                🤖 Computer
-                {isComputerTurn && <span className="ml-2 text-xs bg-red-600 px-2 py-1 rounded animate-pulse">Thinking...</span>}
-              </h3>
+      {/* Main Game Area */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-6">
+        <div className="space-y-6">
+          {/* Computer Player Area */}
+          <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-red-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">🤖</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold">Computer</h3>
+                  <p className="text-white/60 text-sm">
+                    {isComputerTurn ? 'Thinking...' : 'Waiting'}
+                  </p>
+                </div>
+                {isComputerTurn && (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                    <span className="text-red-400 text-sm font-medium">Active</span>
+                  </div>
+                )}
+              </div>
               
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="bg-gray-600 px-2 py-1 rounded text-white">
-                  {gameState.players[1].hand.length} cards
-                </span>
+              <div className="flex items-center space-x-4">
+                <div className="text-right">
+                  <div className="text-white font-bold text-lg">{gameState.players[1].hand.length}</div>
+                  <div className="text-white/60 text-xs">cards</div>
+                </div>
                 {gameState.players[1].nikoKadiCalled && (
-                  <span className="bg-yellow-500 px-2 py-1 rounded font-bold text-black">
-                    Niko Kadi!
-                  </span>
+                  <div className="bg-yellow-500 px-3 py-1 rounded-full">
+                    <span className="text-black font-bold text-sm">Niko Kadi!</span>
+                  </div>
                 )}
               </div>
             </div>
             
-            {/* CRYSTAL CLEAR Card Backs with HIGH-QUALITY Coat of Arms */}
-            <div className="flex flex-wrap gap-1">
+            {/* Computer's Cards */}
+            <div className="flex flex-wrap gap-2 justify-center">
               {gameState.players[1].hand.map((_, index) => (
                 <div
                   key={index}
-                  className="w-12 h-16 bg-gradient-to-br from-red-700 to-red-900 rounded-lg border-2 border-yellow-400 flex flex-col items-center justify-center relative overflow-hidden"
+                  className="w-12 h-16 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg border border-white/20 flex items-center justify-center relative overflow-hidden group hover:scale-105 transition-transform"
                 >
-                  {/* CRYSTAL CLEAR HIGH-QUALITY Kenyan Coat of Arms */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <img 
-                      src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Coat_of_arms_of_Kenya_%28Official%29.svg/1200px-Coat_of_arms_of_Kenya_%28Official%29.svg.png" 
-                      alt="Kenya Coat of Arms"
-                      className="w-10 h-10 object-contain opacity-95"
-                      style={{
-                        filter: 'brightness(1.8) contrast(1.4) saturate(1.6) drop-shadow(0 0 6px rgba(255,255,255,0.4))'
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Bright golden border frame */}
-                  <div className="absolute inset-0.5 border-2 border-yellow-300 opacity-70 rounded-lg"></div>
-                  
-                  {/* Larger, brighter corner decorations */}
-                  <div className="absolute top-0 left-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-br-lg"></div>
-                  <div className="absolute top-0 right-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-bl-lg"></div>
-                  <div className="absolute bottom-0 left-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-tr-lg"></div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-yellow-300 opacity-80 rounded-tl-lg"></div>
-                  
-                  {/* "KADI" text at bottom with much better visibility */}
-                  <div className="absolute bottom-0 left-0 right-0 text-center bg-black bg-opacity-40 rounded-b-lg">
-                    <div className="text-yellow-200 text-xs font-bold drop-shadow-lg">KADI</div>
-                  </div>
-                  
-                  {/* Additional glow effect */}
-                  <div className="absolute inset-0 bg-yellow-400 opacity-10 rounded-lg animate-pulse"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="text-white/40 text-xs font-bold">KADI</div>
                 </div>
               ))}
             </div>
           </div>
           
-          {/* Game Board */}
-          <GameBoard
-            gameState={gameState}
-            onDrawCard={handleDrawCard}
-          />
+          {/* Game Board - Center Table */}
+          <div className="relative">
+            <GameBoard
+              gameState={gameState}
+              onDrawCard={handleDrawCard}
+            />
+          </div>
           
           {/* Game Controls */}
-          <GameControls
-            gameState={gameState}
-            selectedCards={selectedCards}
-            onPlayCards={handlePlayCards}
-            onDeclareNikoKadi={handleDeclareNikoKadi}
-            onDrawPenalty={handleDrawPenalty}
-            canPlaySelected={canPlaySelected}
-          />
+          <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
+            <GameControls
+              gameState={gameState}
+              selectedCards={selectedCards}
+              onPlayCards={handlePlayCards}
+              onDeclareNikoKadi={handleDeclareNikoKadi}
+              onDrawPenalty={handleDrawPenalty}
+              canPlaySelected={canPlaySelected}
+            />
+          </div>
           
-          {/* Player 1 (Current User) */}
-          <PlayerHand
-            player={gameState.players[0]}
-            isCurrentPlayer={gameState.currentPlayerIndex === 0}
-            selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
-            playableCards={playableCards}
-            onCardClick={handleCardClick}
-            isMyTurn={!isComputerTurn}
-          />
+          {/* Player Hand */}
+          <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
+            <PlayerHand
+              player={gameState.players[0]}
+              isCurrentPlayer={gameState.currentPlayerIndex === 0}
+              selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
+              playableCards={playableCards}
+              onCardClick={handleCardClick}
+              isMyTurn={!isComputerTurn}
+            />
+          </div>
           
           {/* Game Status */}
           <GameStatus gameState={gameState} onNewGame={handleNewGame} />
         </div>
       </div>
 
-      {/* Fixed Footer */}
-      <div className="flex-shrink-0 p-4 bg-black bg-opacity-20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto text-center">
+      {/* Bottom Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black/30 backdrop-blur-md border-t border-white/10 p-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-center">
           <button
             onClick={handleNewGame}
-            className="px-6 py-2 bg-white bg-opacity-20 text-white font-bold rounded-lg
-                       hover:bg-opacity-30 transition-all duration-200 transform hover:scale-105"
+            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg"
           >
             New Game
           </button>
@@ -261,56 +280,57 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       
       {/* Difficulty Modal */}
       {showDifficultyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full">
-            <div className="bg-gradient-to-r from-red-500 to-red-600 p-4 text-white rounded-t-xl">
-              <h3 className="text-xl font-bold">Select Difficulty</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl border border-white/20 max-w-md w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 text-white">
+              <h3 className="text-xl font-bold">Game Settings</h3>
+              <p className="text-emerald-100 text-sm mt-1">Choose AI difficulty level</p>
             </div>
             
-            <div className="p-6 space-y-3">
+            <div className="p-6 space-y-4">
               <button
                 onClick={() => handleDifficultyChange('easy')}
-                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
                   gameState.aiDifficulty === 'easy' 
-                    ? 'border-green-500 bg-green-50' 
-                    : 'border-gray-300 hover:border-green-300'
+                    ? 'border-green-500 bg-green-500/10 text-white' 
+                    : 'border-white/20 hover:border-green-400 text-white/80 hover:text-white'
                 }`}
               >
-                <h4 className="font-bold text-green-600">🟢 Easy</h4>
-                <p className="text-sm text-gray-600">Computer plays randomly</p>
+                <h4 className="font-bold text-green-400">🟢 Easy</h4>
+                <p className="text-sm text-white/60 mt-1">Computer plays randomly</p>
               </button>
               
               <button
                 onClick={() => handleDifficultyChange('medium')}
-                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
                   gameState.aiDifficulty === 'medium' 
-                    ? 'border-yellow-500 bg-yellow-50' 
-                    : 'border-gray-300 hover:border-yellow-300'
+                    ? 'border-yellow-500 bg-yellow-500/10 text-white' 
+                    : 'border-white/20 hover:border-yellow-400 text-white/80 hover:text-white'
                 }`}
               >
-                <h4 className="font-bold text-yellow-600">🟡 Medium</h4>
-                <p className="text-sm text-gray-600">Computer uses basic strategy</p>
+                <h4 className="font-bold text-yellow-400">🟡 Medium</h4>
+                <p className="text-sm text-white/60 mt-1">Computer uses basic strategy</p>
               </button>
               
               <button
                 onClick={() => handleDifficultyChange('hard')}
-                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
                   gameState.aiDifficulty === 'hard' 
-                    ? 'border-red-500 bg-red-50' 
-                    : 'border-gray-300 hover:border-red-300'
+                    ? 'border-red-500 bg-red-500/10 text-white' 
+                    : 'border-white/20 hover:border-red-400 text-white/80 hover:text-white'
                 }`}
               >
-                <h4 className="font-bold text-red-600">🔴 Hard</h4>
-                <p className="text-sm text-gray-600">Computer plays strategically</p>
+                <h4 className="font-bold text-red-400">🔴 Hard</h4>
+                <p className="text-sm text-white/60 mt-1">Computer plays strategically</p>
               </button>
             </div>
             
-            <div className="p-4 border-t">
+            <div className="p-4 border-t border-white/10">
               <button
                 onClick={() => setShowDifficultyModal(false)}
-                className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors"
               >
-                Cancel
+                Close
               </button>
             </div>
           </div>

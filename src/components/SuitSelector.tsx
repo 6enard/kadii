@@ -10,11 +10,11 @@ export const SuitSelector: React.FC<SuitSelectorProps> = ({ onSelectSuit }) => {
   const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
-        <div className="text-center mb-6">
-          <h3 className="text-2xl font-bold text-gray-800 mb-2">Choose a Suit</h3>
-          <p className="text-gray-600">Select the suit for your Ace (wild card)</p>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-3xl border border-white/20 shadow-2xl p-8 max-w-md w-full">
+        <div className="text-center mb-8">
+          <h3 className="text-3xl font-bold text-white mb-3">Choose a Suit</h3>
+          <p className="text-white/70">Select the suit for your Ace (wild card)</p>
         </div>
         
         <div className="grid grid-cols-2 gap-4">
@@ -22,21 +22,26 @@ export const SuitSelector: React.FC<SuitSelectorProps> = ({ onSelectSuit }) => {
             <button
               key={suit}
               onClick={() => onSelectSuit(suit)}
-              className={`
-                w-full h-24 rounded-xl border-2 flex flex-col items-center justify-center
-                hover:bg-gray-50 transition-all duration-300 transform hover:scale-105
-                border-gray-300 hover:border-gray-400 shadow-lg hover:shadow-xl
-                bg-gradient-to-br from-white to-gray-50
-              `}
+              className="group relative w-full h-28 rounded-2xl border-2 border-white/20 hover:border-white/40 
+                         bg-gradient-to-br from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700
+                         flex flex-col items-center justify-center transition-all duration-300 
+                         transform hover:scale-105 shadow-lg hover:shadow-xl"
             >
-              <div className={`text-4xl mb-1 ${SUIT_COLORS[suit]}`}>{SUIT_SYMBOLS[suit]}</div>
-              <div className="text-sm font-bold capitalize text-gray-700">{suit}</div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 rounded-2xl bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              
+              <div className={`text-5xl mb-2 ${SUIT_COLORS[suit]} drop-shadow-lg`}>
+                {SUIT_SYMBOLS[suit]}
+              </div>
+              <div className="text-sm font-bold capitalize text-white/90 group-hover:text-white">
+                {suit}
+              </div>
             </button>
           ))}
         </div>
         
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
+        <div className="mt-8 text-center">
+          <p className="text-xs text-white/50 bg-white/5 rounded-lg p-3">
             🎯 Ace cards can answer questions and counter penalties!
           </p>
         </div>

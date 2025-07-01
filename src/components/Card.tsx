@@ -26,14 +26,20 @@ export const Card: React.FC<CardProps> = ({
     large: 'w-20 h-28 text-base'
   };
   
-  const getCategoryGradient = () => {
+  const getCategoryStyles = () => {
     switch (category) {
-      case 'penalty': return 'bg-white border-red-400';
-      case 'jump': return 'bg-white border-red-500';
-      case 'kickback': return 'bg-white border-red-600';
-      case 'question': return 'bg-white border-red-700';
-      case 'wild': return 'bg-white border-red-800';
-      default: return 'bg-white border-gray-300';
+      case 'penalty': 
+        return 'bg-gradient-to-br from-white to-red-50 border-red-400 shadow-red-200';
+      case 'jump': 
+        return 'bg-gradient-to-br from-white to-blue-50 border-blue-400 shadow-blue-200';
+      case 'kickback': 
+        return 'bg-gradient-to-br from-white to-purple-50 border-purple-400 shadow-purple-200';
+      case 'question': 
+        return 'bg-gradient-to-br from-white to-orange-50 border-orange-400 shadow-orange-200';
+      case 'wild': 
+        return 'bg-gradient-to-br from-white to-yellow-50 border-yellow-400 shadow-yellow-200';
+      default: 
+        return 'bg-gradient-to-br from-white to-gray-50 border-gray-300 shadow-gray-200';
     }
   };
   
@@ -41,46 +47,50 @@ export const Card: React.FC<CardProps> = ({
     <div
       className={`
         ${sizeClasses[size]}
-        rounded-xl border-2 flex flex-col relative
-        cursor-pointer transition-all duration-300
-        ${getCategoryGradient()}
-        ${isSelected ? 'ring-4 ring-yellow-400 transform -translate-y-3 scale-110' : ''}
-        ${isPlayable ? 'hover:transform hover:-translate-y-2 hover:scale-105' : ''}
-        ${!isPlayable && onClick ? 'opacity-50 cursor-not-allowed' : ''}
+        rounded-xl border-2 flex flex-col relative overflow-hidden
+        cursor-pointer transition-all duration-300 shadow-lg
+        ${getCategoryStyles()}
+        ${isSelected ? 'ring-4 ring-emerald-400 shadow-2xl shadow-emerald-200' : ''}
+        ${isPlayable ? 'hover:shadow-xl hover:shadow-emerald-200/50 border-emerald-300' : ''}
+        ${!isPlayable && onClick ? 'opacity-60 cursor-not-allowed' : ''}
+        ${onClick ? 'hover:scale-105' : ''}
       `}
       onClick={onClick}
     >
-      {/* Top corner only */}
-      <div className={`${suitColor} text-center leading-none p-1 bg-white rounded-tl-xl rounded-br-lg`}>
-        <div className="font-black text-lg">{card.rank}</div>
-        <div className="text-xl">{SUIT_SYMBOLS[card.suit]}</div>
+      {/* Card Header */}
+      <div className={`${suitColor} p-1 bg-white/90 backdrop-blur-sm`}>
+        <div className="text-center leading-none">
+          <div className="font-black text-lg">{card.rank}</div>
+          <div className="text-xl">{SUIT_SYMBOLS[card.suit]}</div>
+        </div>
       </div>
       
-      {/* Center - Kenyan Coat of Arms with PROMINENT suit symbol */}
-      <div className="flex-1 flex items-center justify-center relative">
-        {/* Background coat of arms - subtle */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-10">
-          <img 
-            src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Coat_of_arms_of_Kenya_%28Official%29.svg/1200px-Coat_of_arms_of_Kenya_%28Official%29.svg.png" 
-            alt="Kenya Coat of Arms"
-            className="w-8 h-8 object-contain filter grayscale"
-          />
+      {/* Card Body */}
+      <div className="flex-1 flex items-center justify-center relative p-2">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 rounded-b-xl"></div>
         </div>
         
-        {/* PROMINENT suit symbol in center */}
-        <div className={`${suitColor} text-3xl font-black z-10 bg-white rounded-full w-12 h-12 flex items-center justify-center`}>
+        {/* Main suit symbol */}
+        <div className={`${suitColor} text-4xl font-black z-10 drop-shadow-sm`}>
           {SUIT_SYMBOLS[card.suit]}
         </div>
       </div>
       
       {/* Special card indicator */}
       {category !== 'answer' && (
-        <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 animate-pulse border border-white"></div>
+        <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 border border-white shadow-sm"></div>
       )}
       
-      {/* Glow effect for selected cards */}
+      {/* Selection glow */}
       {isSelected && (
-        <div className="absolute inset-0 rounded-xl bg-yellow-400 opacity-20 animate-pulse"></div>
+        <div className="absolute inset-0 rounded-xl bg-emerald-400/20 animate-pulse"></div>
+      )}
+      
+      {/* Playable indicator */}
+      {isPlayable && !isSelected && (
+        <div className="absolute inset-0 rounded-xl bg-emerald-400/10 opacity-0 hover:opacity-100 transition-opacity"></div>
       )}
     </div>
   );

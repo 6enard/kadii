@@ -1,6 +1,7 @@
 import React from 'react';
 import { Player } from '../types';
 import { Card } from './Card';
+import { User, Crown } from 'lucide-react';
 
 interface PlayerHandProps {
   player: Player;
@@ -20,58 +21,111 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   isMyTurn
 }) => {
   return (
-    <div className={`
-      p-4 rounded-xl border-2 transition-all duration-300 backdrop-blur-sm
-      ${isCurrentPlayer 
-        ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-xl shadow-blue-200' 
-        : 'border-gray-400 bg-gradient-to-r from-gray-50 to-slate-50 shadow-lg'
-      }
-    `}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className={`font-bold text-lg flex items-center space-x-2 ${
-          isCurrentPlayer ? 'text-blue-700' : 'text-gray-700'
-        }`}>
-          <span>{player.name === 'Player 1' ? '👤' : '🤖'} {player.name}</span>
-          {isCurrentPlayer && (
-            <span className="text-xs bg-blue-600 text-white px-3 py-1 rounded-full animate-pulse">
-              Your Turn
-            </span>
+    <div className="space-y-4">
+      {/* Player Info Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            isCurrentPlayer 
+              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' 
+              : 'bg-gradient-to-r from-slate-600 to-slate-700'
+          }`}>
+            {player.name === 'Player 1' ? (
+              <User size={20} className="text-white" />
+            ) : (
+              <Crown size={20} className="text-white" />
+            )}
+          </div>
+          
+          <div>
+            <h3 className="text-white font-semibold text-lg">{player.name}</h3>
+            <p className={`text-sm ${
+              isCurrentPlayer ? 'text-emerald-300' : 'text-white/60'
+            }`}>
+              {isCurrentPlayer ? (isMyTurn ? 'Your Turn' : 'Waiting for opponent') : 'Waiting'}
+            </p>
+          </div>
+          
+          {isCurrentPlayer && isMyTurn && (
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <span className="text-emerald-400 text-sm font-medium">Active</span>
+            </div>
           )}
-        </h3>
+        </div>
         
-        <div className="flex items-center space-x-2">
-          <span className="bg-gray-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-            {player.hand.length} cards
-          </span>
+        <div className="flex items-center space-x-4">
+          <div className="text-right">
+            <div className="text-white font-bold text-xl">{player.hand.length}</div>
+            <div className="text-white/60 text-xs">cards</div>
+          </div>
+          
           {player.nikoKadiCalled && (
-            <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-bounce">
-              🎯 Niko Kadi!
-            </span>
+            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-4 py-2 rounded-full shadow-lg">
+              <span className="text-black font-bold text-sm flex items-center space-x-1">
+                <span>🎯</span>
+                <span>Niko Kadi!</span>
+              </span>
+            </div>
           )}
         </div>
       </div>
       
-      {/* Cards */}
-      <div className="flex flex-wrap gap-2 justify-center">
-        {player.hand.map((card) => (
-          <Card
-            key={card.id}
-            card={card}
-            isSelected={selectedCards.includes(card.id)}
-            isPlayable={isMyTurn && playableCards.includes(card.id)}
-            onClick={() => isMyTurn && onCardClick(card.id)}
-            size="medium"
-          />
-        ))}
-      </div>
-      
-      {/* Hand status */}
-      {player.hand.length === 0 && (
-        <div className="text-center py-4">
-          <div className="text-2xl">🎉</div>
-          <div className="font-bold text-green-600">Hand Empty!</div>
+      {/* Cards Container */}
+      <div className="relative">
+        {/* Selection indicator */}
+        {selectedCards.length > 0 && (
+          <div className="absolute -top-8 left-0 right-0 text-center">
+            <div className="inline-block bg-emerald-500/20 backdrop-blur-sm rounded-full px-3 py-1 border border-emerald-500/30">
+              <span className="text-emerald-300 text-sm font-medium">
+                {selectedCards.length} card{selectedCards.length > 1 ? 's' : ''} selected
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {/* Cards Grid */}
+        <div className="flex flex-wrap gap-3 justify-center p-4 bg-black/20 backdrop-blur-sm rounded-2xl border border-white/10">
+          {player.hand.map((card) => (
+            <div
+              key={card.id}
+              className={`transition-all duration-300 ${
+                selectedCards.includes(card.id) 
+                  ? 'transform -translate-y-4 scale-110' 
+                  : isMyTurn && playableCards.includes(card.id)
+                    ? 'hover:transform hover:-translate-y-2 hover:scale-105'
+                    : ''
+              }`}
+            >
+              <Card
+                card={card}
+                isSelected={selectedCards.includes(card.id)}
+                isPlayable={isMyTurn && playableCards.includes(card.id)}
+                onClick={() => isMyTurn && onCardClick(card.id)}
+                size="medium"
+              />
+            </div>
+          ))}
         </div>
-      )}
+        
+        {/* Empty hand message */}
+        {player.hand.length === 0 && (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-2">🎉</div>
+            <div className="text-white font-bold text-xl">Hand Empty!</div>
+            <div className="text-white/60 text-sm">Waiting for game to end...</div>
+          </div>
+        )}
+        
+        {/* Playability hint */}
+        {isMyTurn && playableCards.length === 0 && player.hand.length > 0 && (
+          <div className="absolute -bottom-8 left-0 right-0 text-center">
+            <div className="inline-block bg-red-500/20 backdrop-blur-sm rounded-full px-3 py-1 border border-red-500/30">
+              <span className="text-red-300 text-sm">No playable cards - draw from deck</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
