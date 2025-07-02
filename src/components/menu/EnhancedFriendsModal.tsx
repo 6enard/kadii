@@ -56,6 +56,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const challengesUnsubscribeRef = useRef<(() => void) | null>(null);
   const friendRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
   const sentRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
+  const listenersSetupRef = useRef(false);
 
   // Memoize queries to prevent duplicate listeners
   const challengesQuery = useMemo(() => {
@@ -88,18 +89,24 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   }, [user?.uid]);
 
   useEffect(() => {
-    if (isOpen && user) {
+    if (isOpen && user && !listenersSetupRef.current) {
+      console.log("Setting up friends modal listeners");
       loadAllUsers();
       loadFriends();
       setupRealtimeListeners();
-    } else {
+      listenersSetupRef.current = true;
+    } else if (!isOpen || !user) {
       cleanupListeners();
+      listenersSetupRef.current = false;
     }
 
     return () => {
-      cleanupListeners();
+      if (!isOpen) {
+        cleanupListeners();
+        listenersSetupRef.current = false;
+      }
     };
-  }, [isOpen, user, challengesQuery, incomingRequestsQuery, sentRequestsQuery]);
+  }, [isOpen, user]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -114,6 +121,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   }, [searchQuery, allUsers, user]);
 
   const cleanupListeners = () => {
+    console.log("Cleaning up friends modal listeners");
     if (challengesUnsubscribeRef.current) {
       challengesUnsubscribeRef.current();
       challengesUnsubscribeRef.current = null;
@@ -131,7 +139,10 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const setupRealtimeListeners = () => {
     if (!user?.uid || !challengesQuery || !incomingRequestsQuery || !sentRequestsQuery) return;
 
-    cleanupListeners();
+    // Don't setup if already setup
+    if (challengesUnsubscribeRef.current || friendRequestsUnsubscribeRef.current || sentRequestsUnsubscribeRef.current) {
+      return;
+    }
 
     try {
       setConnectionStatus('connected');
