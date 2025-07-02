@@ -7,14 +7,18 @@ import {
   onSnapshot, 
   doc, 
   updateDoc,
-  deleteDoc 
+  deleteDoc,
+  addDoc,
+  serverTimestamp,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
-import { GameChallenge } from '../../types';
+import { GameChallenge, OnlineGameSession } from '../../types';
+import { initializeGame } from '../../utils/gameLogic';
 
 interface ChallengeNotificationProps {
-  onStartChallenge: (opponentId: string, opponentName: string) => void;
+  onStartChallenge: (gameSessionId: string, opponentId: string, opponentName: string) => void;
 }
 
 export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ onStartChallenge }) => {
@@ -25,8 +29,11 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
   // Use ref to track the listener and prevent multiple subscriptions
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const listenerSetupRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (!user?.uid) {
       setAcceptedChallenges([]);
       setShowNotification(false);
@@ -48,16 +55,18 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
 
     // Cleanup function
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-        listenerSetupRef.current = false;
+      if (!mountedRef.current) {
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+          listenerSetupRef.current = false;
+        }
       }
     };
   }, [user?.uid]);
 
   const setupChallengeListener = () => {
-    if (!user?.uid || unsubscribeRef.current) return;
+    if (!user?.uid || unsubscribeRef.current || !mountedRef.current) return;
 
     try {
       // Create the query
@@ -69,6 +78,8 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
 
       // Set up the listener with proper error handling
       unsubscribeRef.current = onSnapshot(challengesQuery, (snapshot) => {
+        if (!mountedRef.current) return;
+        
         const accepted: GameChallenge[] = [];
         
         snapshot.forEach((doc) => {
@@ -92,32 +103,88 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
         console.error('Error listening to challenges:', error);
         
         // For any errors, reset state
-        setAcceptedChallenges([]);
-        setShowNotification(false);
+        if (mountedRef.current) {
+          setAcceptedChallenges([]);
+          setShowNotification(false);
+        }
       });
 
     } catch (error) {
       console.error('Error setting up challenge notification listener:', error);
-      setAcceptedChallenges([]);
-      setShowNotification(false);
+      if (mountedRef.current) {
+        setAcceptedChallenges([]);
+        setShowNotification(false);
+      }
     }
   };
 
   const handleStartGame = async (challenge: GameChallenge) => {
+    if (!user || !mountedRef.current) return;
+    
     try {
-      // Mark challenge as started/completed
-      await updateDoc(doc(db, 'challenges', challenge.id), {
-        status: 'completed'
+      // Use a transaction to create the game session and update the challenge
+      await runTransaction(db, async (transaction) => {
+        // Create a new game session
+        const gameState = initializeGame();
+        gameState.isOnlineGame = true;
+        gameState.hostId = user.uid; // The challenger becomes the host
+        
+        // Set up players with correct IDs and names
+        gameState.players[0] = {
+          id: user.uid,
+          name: user.displayName || 'Player',
+          hand: gameState.players[0].hand,
+          nikoKadiCalled: false,
+          isOnline: true
+        };
+        
+        gameState.players[1] = {
+          id: challenge.toUserId,
+          name: challenge.toUsername,
+          hand: gameState.players[1].hand,
+          nikoKadiCalled: false,
+          isOnline: true
+        };
+
+        const gameSession: Partial<OnlineGameSession> = {
+          hostId: user.uid,
+          hostName: user.displayName || 'Player',
+          guestId: challenge.toUserId,
+          guestName: challenge.toUsername,
+          gameState: gameState,
+          status: 'active',
+          createdAt: new Date(),
+          lastMoveAt: new Date()
+        };
+
+        // Create the game session
+        const gameSessionRef = doc(collection(db, 'gameSessions'));
+        transaction.set(gameSessionRef, gameSession);
+        
+        // Update the challenge status
+        const challengeRef = doc(db, 'challenges', challenge.id);
+        transaction.update(challengeRef, {
+          status: 'completed',
+          gameSessionId: gameSessionRef.id
+        });
+        
+        // Store the game session ID for later use
+        (window as any).pendingGameSessionId = gameSessionRef.id;
       });
 
-      // Start the game
-      onStartChallenge(challenge.toUserId, challenge.toUsername);
+      // Start the game with the created session
+      const gameSessionId = (window as any).pendingGameSessionId;
+      if (gameSessionId) {
+        onStartChallenge(gameSessionId, challenge.toUserId, challenge.toUsername);
+      }
       
       // Remove from notifications
-      setAcceptedChallenges(prev => prev.filter(c => c.id !== challenge.id));
-      
-      if (acceptedChallenges.length <= 1) {
-        setShowNotification(false);
+      if (mountedRef.current) {
+        setAcceptedChallenges(prev => prev.filter(c => c.id !== challenge.id));
+        
+        if (acceptedChallenges.length <= 1) {
+          setShowNotification(false);
+        }
       }
     } catch (error) {
       console.error('Error starting challenge game:', error);
@@ -130,10 +197,12 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
       await deleteDoc(doc(db, 'challenges', challenge.id));
       
       // Remove from notifications
-      setAcceptedChallenges(prev => prev.filter(c => c.id !== challenge.id));
-      
-      if (acceptedChallenges.length <= 1) {
-        setShowNotification(false);
+      if (mountedRef.current) {
+        setAcceptedChallenges(prev => prev.filter(c => c.id !== challenge.id));
+        
+        if (acceptedChallenges.length <= 1) {
+          setShowNotification(false);
+        }
       }
     } catch (error) {
       console.error('Error dismissing challenge:', error);

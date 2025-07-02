@@ -27,9 +27,8 @@ import {
   addDoc, 
   collection, 
   serverTimestamp,
-  getDoc,
   enableNetwork,
-  disableNetwork
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
@@ -62,8 +61,11 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
   const gameUnsubscribeRef = useRef<(() => void) | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastHeartbeatRef = useRef<Date>(new Date());
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (!user || !gameSessionId) {
       setError({
         code: 'invalid-session',
@@ -78,14 +80,18 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
     setupGameListeners();
 
     return () => {
+      mountedRef.current = false;
       cleanupListeners();
     };
   }, [user, gameSessionId]);
 
   useEffect(() => {
-    if (gameState && user) {
-      const currentPlayer = getCurrentPlayer(gameState);
-      setIsMyTurn(currentPlayer.id === user.uid);
+    if (gameState && user && mountedRef.current) {
+      // Find which player index corresponds to the current user
+      const myPlayerIndex = gameState.players.findIndex(p => p.id === user.uid);
+      if (myPlayerIndex !== -1) {
+        setIsMyTurn(gameState.currentPlayerIndex === myPlayerIndex);
+      }
     }
   }, [gameState, user]);
 
@@ -101,6 +107,8 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
   };
 
   const setupGameListeners = async () => {
+    if (!mountedRef.current) return;
+    
     try {
       setConnectionStatus('connecting');
       setError(null);
@@ -112,6 +120,8 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       const gameSessionRef = doc(db, 'gameSessions', gameSessionId);
       
       gameUnsubscribeRef.current = onSnapshot(gameSessionRef, (doc) => {
+        if (!mountedRef.current) return;
+        
         try {
           if (doc.exists()) {
             const session = { id: doc.id, ...doc.data() } as OnlineGameSession;
@@ -138,9 +148,13 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
           }
         } catch (err) {
           console.error('Error processing game session update:', err);
-          setGameError(err as Error);
+          if (mountedRef.current) {
+            setGameError(err as Error);
+          }
         }
       }, (error) => {
+        if (!mountedRef.current) return;
+        
         console.error('Error listening to game session:', error);
         const appError = ErrorHandler.handleFirebaseError(error, 'listening to game session');
         setError(appError);
@@ -152,6 +166,8 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       });
 
     } catch (error: any) {
+      if (!mountedRef.current) return;
+      
       console.error('Error setting up game listeners:', error);
       const appError = ErrorHandler.handleFirebaseError(error, 'setting up game listeners');
       setError(appError);
@@ -164,17 +180,19 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
   };
 
   const scheduleReconnect = () => {
-    if (reconnectTimeoutRef.current) return;
+    if (reconnectTimeoutRef.current || !mountedRef.current) return;
     
     setConnectionStatus('reconnecting');
     reconnectTimeoutRef.current = setTimeout(() => {
-      reconnectTimeoutRef.current = null;
-      setupGameListeners();
+      if (mountedRef.current) {
+        reconnectTimeoutRef.current = null;
+        setupGameListeners();
+      }
     }, 5000);
   };
 
   const makeMove = async (moveType: string, data: any = {}) => {
-    if (!user || !gameState || !gameSession) {
+    if (!user || !gameState || !gameSession || !mountedRef.current) {
       setError({
         code: 'invalid-state',
         message: 'Invalid game state',
@@ -201,60 +219,76 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
 
     try {
       await ErrorHandler.withRetry(async () => {
-        // Create the move record
-        const move: Partial<GameMove> = {
-          gameId: gameSessionId,
-          playerId: user.uid,
-          playerName: user.displayName || 'Player',
-          moveType: moveType as any,
-          timestamp: new Date(),
-          ...data
-        };
-
-        // Apply the move locally first for immediate feedback
-        let newGameState = { ...gameState };
-        
-        try {
-          switch (moveType) {
-            case 'playCards':
-              newGameState = playCards(gameState, { cardIds: data.cardIds, declaredSuit: data.declaredSuit });
-              break;
-            case 'drawCard':
-              newGameState = drawCard(gameState, gameState.currentPlayerIndex);
-              break;
-            case 'declareNikoKadi':
-              newGameState = declareNikoKadi(gameState);
-              break;
-            case 'selectSuit':
-              newGameState = selectSuit(gameState, data.selectedSuit);
-              break;
-            case 'drawPenalty':
-              newGameState = handlePenaltyDraw(gameState);
-              break;
-            default:
-              throw new Error(`Unknown move type: ${moveType}`);
+        // Use a transaction to ensure atomic updates
+        await runTransaction(db, async (transaction) => {
+          const gameSessionRef = doc(db, 'gameSessions', gameSessionId);
+          const gameSessionDoc = await transaction.get(gameSessionRef);
+          
+          if (!gameSessionDoc.exists()) {
+            throw new Error('Game session not found');
           }
-        } catch (gameLogicError) {
-          throw new Error(`Invalid move: ${(gameLogicError as Error).message}`);
-        }
+          
+          const currentSession = gameSessionDoc.data() as OnlineGameSession;
+          let newGameState = { ...currentSession.gameState };
+          
+          // Apply the move locally
+          try {
+            switch (moveType) {
+              case 'playCards':
+                newGameState = playCards(newGameState, { 
+                  cardIds: data.cardIds, 
+                  declaredSuit: data.declaredSuit 
+                });
+                break;
+              case 'drawCard':
+                newGameState = drawCard(newGameState, newGameState.currentPlayerIndex);
+                break;
+              case 'declareNikoKadi':
+                newGameState = declareNikoKadi(newGameState);
+                break;
+              case 'selectSuit':
+                newGameState = selectSuit(newGameState, data.selectedSuit);
+                break;
+              case 'drawPenalty':
+                newGameState = handlePenaltyDraw(newGameState);
+                break;
+              default:
+                throw new Error(`Unknown move type: ${moveType}`);
+            }
+          } catch (gameLogicError) {
+            throw new Error(`Invalid move: ${(gameLogicError as Error).message}`);
+          }
 
-        move.gameStateAfter = newGameState;
+          // Update the game session
+          transaction.update(gameSessionRef, {
+            gameState: newGameState,
+            lastMoveAt: serverTimestamp(),
+            status: newGameState.gamePhase === 'gameOver' ? 'completed' : 'active',
+            winner: newGameState.winner || null
+          });
 
-        // Update the game session in Firestore
-        await updateDoc(doc(db, 'gameSessions', gameSessionId), {
-          gameState: newGameState,
-          lastMoveAt: serverTimestamp(),
-          status: newGameState.gamePhase === 'gameOver' ? 'completed' : 'active',
-          winner: newGameState.winner || null
+          // Create the move record
+          const move: Partial<GameMove> = {
+            gameId: gameSessionId,
+            playerId: user.uid,
+            playerName: user.displayName || 'Player',
+            moveType: moveType as any,
+            timestamp: new Date(),
+            gameStateAfter: newGameState,
+            ...data
+          };
+
+          // Add the move to the moves collection
+          const moveRef = doc(collection(db, 'gameMoves'));
+          transaction.set(moveRef, move);
         });
-
-        // Add the move to the moves collection for history
-        await addDoc(collection(db, 'gameMoves'), move);
       }, `making ${moveType} move`);
 
       setSelectedCards([]);
       
     } catch (error: any) {
+      if (!mountedRef.current) return;
+      
       console.error('Error making move:', error);
       if (error instanceof Error && error.message.includes('Invalid move')) {
         setError({
@@ -269,7 +303,9 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
         setError(appError);
       }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -366,11 +402,15 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       setSelectedCards([]);
       
     } catch (error: any) {
+      if (!mountedRef.current) return;
+      
       console.error('Error starting new game:', error);
       const appError = ErrorHandler.handleFirebaseError(error, 'starting new game');
       setError(appError);
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [user, gameSession, gameSessionId, isLoading]);
 
@@ -460,7 +500,6 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
     );
   }
 
-  const currentPlayer = getCurrentPlayer(gameState);
   const myPlayer = gameState.players.find(p => p.id === user?.uid);
   const opponent = gameState.players.find(p => p.id !== user?.uid);
   

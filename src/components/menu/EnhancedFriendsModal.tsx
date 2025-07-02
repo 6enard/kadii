@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, UserMinus, Check, Clock, Gamepad2, Trash2, AlertTriangle } from 'lucide-react';
 import { 
   collection, 
   query, 
@@ -9,15 +9,14 @@ import {
   arrayUnion, 
   arrayRemove,
   getDoc, 
-  enableNetwork, 
-  disableNetwork,
+  enableNetwork,
   addDoc,
   where,
   orderBy,
   onSnapshot,
   deleteDoc,
   serverTimestamp,
-  setDoc
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -57,6 +56,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const friendRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
   const sentRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
   const listenersSetupRef = useRef(false);
+  const mountedRef = useRef(true);
 
   // Memoize queries to prevent duplicate listeners
   const challengesQuery = useMemo(() => {
@@ -89,6 +89,8 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   }, [user?.uid]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (isOpen && user && !listenersSetupRef.current) {
       console.log("Setting up friends modal listeners");
       loadAllUsers();
@@ -102,6 +104,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
     return () => {
       if (!isOpen) {
+        mountedRef.current = false;
         cleanupListeners();
         listenersSetupRef.current = false;
       }
@@ -137,7 +140,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const setupRealtimeListeners = () => {
-    if (!user?.uid || !challengesQuery || !incomingRequestsQuery || !sentRequestsQuery) return;
+    if (!user?.uid || !challengesQuery || !incomingRequestsQuery || !sentRequestsQuery || !mountedRef.current) return;
 
     // Don't setup if already setup
     if (challengesUnsubscribeRef.current || friendRequestsUnsubscribeRef.current || sentRequestsUnsubscribeRef.current) {
@@ -150,6 +153,8 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
       // Set up challenges listener
       challengesUnsubscribeRef.current = onSnapshot(challengesQuery, (snapshot) => {
+        if (!mountedRef.current) return;
+        
         const incoming: GameChallenge[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
@@ -163,6 +168,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         setChallenges(incoming);
         setConnectionStatus('connected');
       }, (error) => {
+        if (!mountedRef.current) return;
         console.error('Error in challenges listener:', error);
         const appError = ErrorHandler.handleFirebaseError(error, 'loading challenges');
         setError(appError);
@@ -171,6 +177,8 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
       // Set up friend requests listener
       friendRequestsUnsubscribeRef.current = onSnapshot(incomingRequestsQuery, (snapshot) => {
+        if (!mountedRef.current) return;
+        
         const incoming: FriendRequest[] = [];
         snapshot.forEach((doc) => {
           incoming.push({ id: doc.id, ...doc.data() } as FriendRequest);
@@ -178,6 +186,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         setFriendRequests(incoming);
         setConnectionStatus('connected');
       }, (error) => {
+        if (!mountedRef.current) return;
         console.error('Error in friend requests listener:', error);
         const appError = ErrorHandler.handleFirebaseError(error, 'loading friend requests');
         setError(appError);
@@ -186,6 +195,8 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
       // Set up sent requests listener
       sentRequestsUnsubscribeRef.current = onSnapshot(sentRequestsQuery, (snapshot) => {
+        if (!mountedRef.current) return;
+        
         const sent: FriendRequest[] = [];
         snapshot.forEach((doc) => {
           sent.push({ id: doc.id, ...doc.data() } as FriendRequest);
@@ -198,6 +209,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         setSentRequests(sent);
         setConnectionStatus('connected');
       }, (error) => {
+        if (!mountedRef.current) return;
         console.error('Error in sent requests listener:', error);
         const appError = ErrorHandler.handleFirebaseError(error, 'loading sent requests');
         setError(appError);
@@ -205,6 +217,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       });
 
     } catch (error: any) {
+      if (!mountedRef.current) return;
       console.error('Error setting up listeners:', error);
       const appError = ErrorHandler.handleFirebaseError(error, 'setting up real-time listeners');
       setError(appError);
@@ -213,7 +226,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const loadAllUsers = async () => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     setLoading(true);
     setError(null);
@@ -238,21 +251,26 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         
         users.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
         
-        setAllUsers(users);
-        setFilteredUsers(users.filter(userData => userData.id !== user.uid));
-        setConnectionStatus('connected');
+        if (mountedRef.current) {
+          setAllUsers(users);
+          setFilteredUsers(users.filter(userData => userData.id !== user.uid));
+          setConnectionStatus('connected');
+        }
       }, 'loading users');
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'loading users');
       setError(appError);
       setConnectionStatus('disconnected');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const loadFriends = async () => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     try {
       await ErrorHandler.withRetry(async () => {
@@ -273,13 +291,20 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
             }
           }
           friendsData.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
-          setFriends(friendsData);
+          if (mountedRef.current) {
+            setFriends(friendsData);
+          }
         } else {
-          setFriends([]);
+          if (mountedRef.current) {
+            setFriends([]);
+          }
         }
-        setConnectionStatus('connected');
+        if (mountedRef.current) {
+          setConnectionStatus('connected');
+        }
       }, 'loading friends');
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'loading friends');
       setError(appError);
       setConnectionStatus('disconnected');
@@ -287,7 +312,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const sendFriendRequest = async (toUserId: string, toUsername: string) => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     try {
       setError(null);
@@ -318,8 +343,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         });
       }, 'sending friend request');
       
-      setConnectionStatus('connected');
+      if (mountedRef.current) {
+        setConnectionStatus('connected');
+      }
     } catch (error: any) {
+      if (!mountedRef.current) return;
       if (error.message?.includes('already sent')) {
         setError({
           code: 'duplicate-request',
@@ -337,34 +365,44 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const respondToFriendRequest = async (requestId: string, response: 'accepted' | 'rejected', request: FriendRequest) => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     try {
       setError(null);
       
       await ErrorHandler.withRetry(async () => {
-        await enableNetwork(db);
-        
-        await updateDoc(doc(db, 'friendRequests', requestId), {
-          status: response,
-          updatedAt: serverTimestamp()
+        await runTransaction(db, async (transaction) => {
+          const requestRef = doc(db, 'friendRequests', requestId);
+          
+          transaction.update(requestRef, {
+            status: response,
+            updatedAt: serverTimestamp()
+          });
+          
+          if (response === 'accepted') {
+            const userRef = doc(db, 'users', user.uid);
+            const friendRef = doc(db, 'users', request.fromUserId);
+            
+            transaction.update(userRef, {
+              friends: arrayUnion(request.fromUserId)
+            });
+            
+            transaction.update(friendRef, {
+              friends: arrayUnion(user.uid)
+            });
+          }
         });
         
         if (response === 'accepted') {
-          await updateDoc(doc(db, 'users', user.uid), {
-            friends: arrayUnion(request.fromUserId)
-          });
-          
-          await updateDoc(doc(db, 'users', request.fromUserId), {
-            friends: arrayUnion(user.uid)
-          });
-          
           await loadFriends();
         }
       }, `${response === 'accepted' ? 'accepting' : 'rejecting'} friend request`);
       
-      setConnectionStatus('connected');
+      if (mountedRef.current) {
+        setConnectionStatus('connected');
+      }
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'responding to friend request');
       setError(appError);
       setConnectionStatus('disconnected');
@@ -372,27 +410,33 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const removeFriend = async (friendId: string) => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     try {
       setError(null);
       
       await ErrorHandler.withRetry(async () => {
-        await enableNetwork(db);
-        
-        await updateDoc(doc(db, 'users', user.uid), {
-          friends: arrayRemove(friendId)
-        });
-        
-        await updateDoc(doc(db, 'users', friendId), {
-          friends: arrayRemove(user.uid)
+        await runTransaction(db, async (transaction) => {
+          const userRef = doc(db, 'users', user.uid);
+          const friendRef = doc(db, 'users', friendId);
+          
+          transaction.update(userRef, {
+            friends: arrayRemove(friendId)
+          });
+          
+          transaction.update(friendRef, {
+            friends: arrayRemove(user.uid)
+          });
         });
         
         await loadFriends();
       }, 'removing friend');
       
-      setConnectionStatus('connected');
+      if (mountedRef.current) {
+        setConnectionStatus('connected');
+      }
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'removing friend');
       setError(appError);
       setConnectionStatus('disconnected');
@@ -400,7 +444,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const sendChallenge = async (toUserId: string, toUsername: string) => {
-    if (!user || challengingUsers.has(toUserId)) return;
+    if (!user || challengingUsers.has(toUserId) || !mountedRef.current) return;
 
     setChallenging(prev => new Set(prev).add(toUserId));
 
@@ -438,9 +482,12 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         });
       }, 'sending challenge');
       
-      setConnectionStatus('connected');
+      if (mountedRef.current) {
+        setConnectionStatus('connected');
+      }
       
     } catch (error: any) {
+      if (!mountedRef.current) return;
       if (error.message?.includes('already sent')) {
         setError({
           code: 'duplicate-challenge',
@@ -455,72 +502,88 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         setConnectionStatus('disconnected');
       }
     } finally {
-      setChallenging(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(toUserId);
-        return newSet;
-      });
+      if (mountedRef.current) {
+        setChallenging(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(toUserId);
+          return newSet;
+        });
+      }
     }
   };
 
   const respondToChallenge = async (challengeId: string, response: 'accepted' | 'rejected', challenge: GameChallenge) => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     try {
       setError(null);
       
       await ErrorHandler.withRetry(async () => {
-        await enableNetwork(db);
-        
-        await updateDoc(doc(db, 'challenges', challengeId), {
-          status: response,
-          updatedAt: serverTimestamp()
+        await runTransaction(db, async (transaction) => {
+          const challengeRef = doc(db, 'challenges', challengeId);
+          
+          transaction.update(challengeRef, {
+            status: response,
+            updatedAt: serverTimestamp()
+          });
+          
+          if (response === 'accepted' && onStartOnlineGame) {
+            // Create a new game session
+            const gameState = initializeGame();
+            gameState.isOnlineGame = true;
+            gameState.hostId = challenge.fromUserId;
+            
+            // Set up players with correct IDs and names
+            gameState.players[0] = {
+              id: challenge.fromUserId,
+              name: challenge.fromUsername,
+              hand: gameState.players[0].hand,
+              nikoKadiCalled: false,
+              isOnline: true
+            };
+            
+            gameState.players[1] = {
+              id: user.uid,
+              name: user.displayName || 'Player',
+              hand: gameState.players[1].hand,
+              nikoKadiCalled: false,
+              isOnline: true
+            };
+
+            const gameSession: Partial<OnlineGameSession> = {
+              hostId: challenge.fromUserId,
+              hostName: challenge.fromUsername,
+              guestId: user.uid,
+              guestName: user.displayName || 'Player',
+              gameState: gameState,
+              status: 'active',
+              createdAt: new Date(),
+              lastMoveAt: new Date()
+            };
+
+            const gameSessionRef = doc(collection(db, 'gameSessions'));
+            transaction.set(gameSessionRef, gameSession);
+            
+            // Store the game session ID for later use
+            (window as any).pendingGameSessionId = gameSessionRef.id;
+          }
         });
         
         if (response === 'accepted' && onStartOnlineGame) {
-          // Create a new game session
-          const gameState = initializeGame();
-          gameState.isOnlineGame = true;
-          gameState.hostId = challenge.fromUserId;
-          
-          // Set up players with correct IDs and names
-          gameState.players[0] = {
-            id: challenge.fromUserId,
-            name: challenge.fromUsername,
-            hand: gameState.players[0].hand,
-            nikoKadiCalled: false,
-            isOnline: true
-          };
-          
-          gameState.players[1] = {
-            id: user.uid,
-            name: user.displayName || 'Player',
-            hand: gameState.players[1].hand,
-            nikoKadiCalled: false,
-            isOnline: true
-          };
-
-          const gameSession: Partial<OnlineGameSession> = {
-            hostId: challenge.fromUserId,
-            hostName: challenge.fromUsername,
-            guestId: user.uid,
-            guestName: user.displayName || 'Player',
-            gameState: gameState,
-            status: 'active',
-            createdAt: new Date(),
-            lastMoveAt: new Date()
-          };
-
-          const gameSessionRef = await addDoc(collection(db, 'gameSessions'), gameSession);
-          
-          // Start the online game
-          onStartOnlineGame(gameSessionRef.id, challenge.fromUserId, challenge.fromUsername);
-          onClose();
+          // Start the online game with the created session
+          const gameSessionId = (window as any).pendingGameSessionId;
+          if (gameSessionId) {
+            onStartOnlineGame(gameSessionId, challenge.fromUserId, challenge.fromUsername);
+            onClose();
+          }
         }
       }, `${response === 'accepted' ? 'accepting' : 'rejecting'} challenge`);
       
-      setConnectionStatus('connected');
+      if (mountedRef.current) {
+        setConnectionStatus('connected');
+      }
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'responding to challenge');
       setError(appError);
       setConnectionStatus('disconnected');
@@ -546,6 +609,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         await loadFriends();
       }, 'refreshing data');
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'refreshing data');
       setError(appError);
       setConnectionStatus('disconnected');
@@ -553,7 +617,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const clearAllData = async () => {
-    if (!user) return;
+    if (!user || !mountedRef.current) return;
 
     setClearingData(true);
     setError(null);
@@ -617,22 +681,29 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         ]);
 
         // Reset local state
-        setChallenges([]);
-        setFriendRequests([]);
-        setSentRequests([]);
-        setFriends([]);
+        if (mountedRef.current) {
+          setChallenges([]);
+          setFriendRequests([]);
+          setSentRequests([]);
+          setFriends([]);
+        }
         
         console.log('Successfully cleared all data');
       }, 'clearing all data');
       
-      setConnectionStatus('connected');
+      if (mountedRef.current) {
+        setConnectionStatus('connected');
+      }
       
     } catch (error: any) {
+      if (!mountedRef.current) return;
       const appError = ErrorHandler.handleFirebaseError(error, 'clearing all data');
       setError(appError);
       setConnectionStatus('disconnected');
     } finally {
-      setClearingData(false);
+      if (mountedRef.current) {
+        setClearingData(false);
+      }
     }
   };
 

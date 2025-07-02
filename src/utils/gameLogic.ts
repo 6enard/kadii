@@ -1,4 +1,4 @@
-import { GameState, Player, Card, PlayCardOptions } from '../types';
+import { GameState, Player, Card, PlayCardOptions, Suit } from '../types';
 import { 
   createDeck, 
   getCardCategory, 
@@ -371,9 +371,9 @@ export function declareNikoKadi(gameState: GameState): GameState {
   return newState;
 }
 
-export function selectSuit(gameState: GameState, suit: string): GameState {
+export function selectSuit(gameState: GameState, suit: Suit): GameState {
   const newState = { ...gameState };
-  newState.selectedSuit = suit as any;
+  newState.selectedSuit = suit;
   newState.gamePhase = 'playing';
   newState.turnHistory.push(`Suit selected: ${suit}`);
   
@@ -486,7 +486,7 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
     const bestSuit = selectBestSuit(currentPlayer.hand, difficulty);
     return playCards(newState, { 
       cardIds: selectedCombination, 
-      declaredSuit: bestSuit 
+      declaredSuit: bestSuit as Suit
     });
   }
   

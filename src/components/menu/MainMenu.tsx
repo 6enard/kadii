@@ -30,9 +30,11 @@ export const MainMenu: React.FC<MainMenuProps> = ({
     }
   };
 
-  const handleStartChallenge = (opponentId: string, opponentName: string) => {
-    // For local multiplayer, just start the regular multiplayer mode
-    onStartMultiplayer();
+  const handleStartChallenge = (gameSessionId: string, opponentId: string, opponentName: string) => {
+    // Start the online game with the provided session details
+    if (onStartOnlineGame) {
+      onStartOnlineGame(gameSessionId, opponentId, opponentName);
+    }
   };
 
   return (
