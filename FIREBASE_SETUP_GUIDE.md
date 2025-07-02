@@ -97,8 +97,8 @@ service cloud.firestore {
     // Game challenges - users can read/write their own challenges
     match /challenges/{challengeId} {
       allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.fromUserId || 
-         request.auth.uid == resource.data.toUserId);
+        ((resource.data.fromUserId is string && request.auth.uid == resource.data.fromUserId) || 
+         (resource.data.toUserId is string && request.auth.uid == resource.data.toUserId));
       allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
     }
     
@@ -174,8 +174,8 @@ service cloud.firestore {
     
     match /challenges/{challengeId} {
       allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.fromUserId || 
-         request.auth.uid == resource.data.toUserId);
+        ((resource.data.fromUserId is string && request.auth.uid == resource.data.fromUserId) || 
+         (resource.data.toUserId is string && request.auth.uid == resource.data.toUserId));
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.fromUserId;
     }
