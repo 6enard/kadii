@@ -73,7 +73,7 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
   
   // If there's a pending question, ANY card that matches suit/rank can answer it
   if (gameState.pendingQuestion) {
-    // All cards must be able to answer the question
+    // All cards must be able to answer the question (match suit or rank)
     return cards.every(card => canAnswerQuestion(card, topCard, gameState.selectedSuit));
   }
   
@@ -82,30 +82,18 @@ export function canPlayerPlay(gameState: GameState, cardIds: string[]): boolean 
     return canPlayCard(cards[0], topCard, gameState.selectedSuit);
   }
   
-  // Multiple card logic
+  // Multiple card logic - FIXED: Only allow same rank cards to be played together
   if (cards.length > 1) {
-    // Rule 1: All cards must be same rank (stacking same rank cards)
+    // Rule: All cards must be same rank
     const firstRank = cards[0].rank;
     const allSameRank = cards.every(card => card.rank === firstRank);
     
-    if (allSameRank) {
-      // At least one card must be playable on the current top card
-      return cards.some(card => canPlayCard(card, topCard, gameState.selectedSuit));
+    if (!allSameRank) {
+      return false; // Cannot play different ranks together
     }
     
-    // Rule 2: Sequential play - each card must be playable on the previous one
-    // This allows stacking questions or mixed cards as long as they form a valid sequence
-    for (let i = 0; i < cards.length; i++) {
-      const currentCard = cards[i];
-      const previousCard = i === 0 ? topCard : cards[i - 1];
-      const currentSelectedSuit = i === 0 ? gameState.selectedSuit : null;
-      
-      if (!canPlayCard(currentCard, previousCard, currentSelectedSuit)) {
-        return false;
-      }
-    }
-    
-    return true;
+    // At least one card must be playable on the current top card
+    return cards.some(card => canPlayCard(card, topCard, gameState.selectedSuit));
   }
   
   return false;
@@ -127,11 +115,8 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     !cardIds.includes(card.id)
   );
   
-  // Sort played cards for optimal play order
-  const sortedPlayedCards = sortPlayedCards(playedCards, getTopCard(newState), newState.selectedSuit);
-  
-  // Add cards to discard pile in the sorted order
-  newState.discardPile.push(...sortedPlayedCards);
+  // Add cards to discard pile
+  newState.discardPile.push(...playedCards);
   
   // Handle special card effects based on all played cards
   let skipNextTurn = false;
@@ -144,7 +129,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   let questionCount = 0;
   let answerCount = 0;
   
-  sortedPlayedCards.forEach(card => {
+  playedCards.forEach(card => {
     const cardCategory = getCardCategory(card.rank);
     switch (cardCategory) {
       case 'penalty':
@@ -172,23 +157,23 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   if (newState.pendingQuestion) {
     // Any cards played while question is pending count as answers
     newState.pendingQuestion = false;
-    newState.turnHistory.push(`${currentPlayer.name} answered the question with ${sortedPlayedCards.length} card(s)`);
+    newState.turnHistory.push(`${currentPlayer.name} answered the question with ${playedCards.length} card(s)`);
   }
   
   // Apply penalty effects
   if (totalPenalty > 0) {
     newState.drawStack += totalPenalty;
-    newState.turnHistory.push(`${currentPlayer.name} played ${sortedPlayedCards.length} penalty card(s) (+${totalPenalty} cards)`);
+    newState.turnHistory.push(`${currentPlayer.name} played ${playedCards.length} penalty card(s) (+${totalPenalty} cards)`);
   }
   
-  // Handle Ace (wild card) effects
+  // Handle Ace (wild card) effects - FIXED: Don't ask for suit when countering
   if (hasWild) {
     if (gameState.drawStack > 0) {
       // Ace is countering penalty - don't change suit, just counter
       newState.drawStack = 0;
       newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace(s)`);
       // When countering, the suit remains the same as the card before the penalty
-      // Don't ask for suit selection
+      // Don't ask for suit selection and don't change selectedSuit
     } else if (gameState.pendingQuestion) {
       // Ace is answering a question - don't ask for suit selection
       // This case is already handled above
@@ -204,19 +189,25 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     }
   }
   
-  // Handle question effects - questions create pending questions that must be answered
+  // Handle question effects - FIXED: Questions don't need answers if followed by matching suit/rank
   if (questionCount > 0 && !newState.pendingQuestion) {
-    // Check if there are enough answer cards in the same play to answer all questions
-    const totalAnswerCards = answerCount + (hasWild ? 1 : 0); // Aces can answer questions
+    // If there are other cards played with questions that match suit/rank, they answer automatically
+    const nonQuestionCards = playedCards.filter(card => getCardCategory(card.rank) !== 'question');
+    const topCard = getTopCard(gameState);
     
-    if (totalAnswerCards < questionCount) {
+    // Check if non-question cards can answer
+    const validAnswers = nonQuestionCards.filter(card => 
+      canAnswerQuestion(card, topCard, gameState.selectedSuit)
+    );
+    
+    if (validAnswers.length < questionCount) {
       // Not enough answers for all questions - create pending question
       newState.pendingQuestion = true;
       newState.turnHistory.push(`${currentPlayer.name} played ${questionCount} question card(s) - must answer remaining questions!`);
       return newState; // Don't change turn
     } else {
       // All questions answered in same play
-      newState.turnHistory.push(`${currentPlayer.name} played ${questionCount} question card(s) with ${totalAnswerCards} answer(s)`);
+      newState.turnHistory.push(`${currentPlayer.name} played ${questionCount} question card(s) with ${validAnswers.length} answer(s)`);
     }
   }
   
@@ -248,14 +239,14 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   }
   
   // Log the play if not already logged
-  if (sortedPlayedCards.length > 1 && !newState.turnHistory[newState.turnHistory.length - 1].includes('penalty') && !newState.turnHistory[newState.turnHistory.length - 1].includes('Ace') && !newState.turnHistory[newState.turnHistory.length - 1].includes('question')) {
-    const cardNames = sortedPlayedCards.map(card => `${card.rank}${card.suit}`).join(', ');
+  if (playedCards.length > 1 && !newState.turnHistory[newState.turnHistory.length - 1].includes('penalty') && !newState.turnHistory[newState.turnHistory.length - 1].includes('Ace') && !newState.turnHistory[newState.turnHistory.length - 1].includes('question')) {
+    const cardNames = playedCards.map(card => `${card.rank}${card.suit}`).join(', ');
     newState.turnHistory.push(`${currentPlayer.name} played multiple cards: ${cardNames}`);
   }
   
-  // Win condition logic
+  // FIXED: Win condition logic - don't automatically give cards
   if (currentPlayer.hand.length === 0) {
-    if (currentPlayer.nikoKadiCalled && canWinWithCards(sortedPlayedCards)) {
+    if (currentPlayer.nikoKadiCalled && canWinWithCards(playedCards)) {
       newState.winner = currentPlayer.name;
       newState.gamePhase = 'gameOver';
       newState.turnHistory.push(`${currentPlayer.name} wins the game!`);
@@ -265,8 +256,16 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       newState.turnHistory.push(`${currentPlayer.name} finished cards but forgot to declare Niko Kadi - no win!`);
       // Don't give them a card automatically - they stay cardless until their next turn
     } else {
-      // Invalid win with special cards
-      drawCard(newState, newState.currentPlayerIndex);
+      // Invalid win with special cards - give them a card
+      if (newState.drawPile.length === 0) {
+        const topCard = newState.discardPile.pop()!;
+        newState.drawPile = shuffleDeck(newState.discardPile);
+        newState.discardPile = [topCard];
+      }
+      if (newState.drawPile.length > 0) {
+        const drawnCard = newState.drawPile.pop()!;
+        currentPlayer.hand.push(drawnCard);
+      }
       newState.turnHistory.push(`${currentPlayer.name} tried to win with invalid cards and drew a card`);
     }
   }
@@ -283,53 +282,6 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   }
   
   return newState;
-}
-
-// Helper function to sort played cards for optimal play order
-function sortPlayedCards(cards: Card[], topCard: Card, selectedSuit: string | null): Card[] {
-  if (cards.length <= 1) return cards;
-  
-  // If all cards are the same rank, return as-is (stacking same rank)
-  const firstRank = cards[0].rank;
-  if (cards.every(card => card.rank === firstRank)) {
-    return cards;
-  }
-  
-  // For mixed cards, try to create a valid sequence
-  const result: Card[] = [];
-  const remaining = [...cards];
-  
-  // Find the best starting card (one that can be played on top card)
-  const playableFirst = remaining.filter(card => canPlayCard(card, topCard, selectedSuit as any));
-  
-  if (playableFirst.length === 0) return cards; // Return original order if no valid start
-  
-  // Start with a playable card
-  result.push(playableFirst[0]);
-  remaining.splice(remaining.indexOf(playableFirst[0]), 1);
-  
-  // Build sequence where each card can be played on the previous
-  while (remaining.length > 0) {
-    const currentTop = result[result.length - 1];
-    
-    // Find next card that can be played on current top
-    const nextPlayable = remaining.find(card => 
-      canPlayCard(card, currentTop, null) || 
-      card.rank === currentTop.rank ||
-      card.suit === currentTop.suit
-    );
-    
-    if (nextPlayable) {
-      result.push(nextPlayable);
-      remaining.splice(remaining.indexOf(nextPlayable), 1);
-    } else {
-      // Add remaining cards in original order
-      result.push(...remaining);
-      break;
-    }
-  }
-  
-  return result;
 }
 
 export function drawCard(gameState: GameState, playerIndex: number): GameState {
@@ -433,7 +385,7 @@ export function selectSuit(gameState: GameState, suit: string): GameState {
 function nextTurn(gameState: GameState): void {
   gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
   
-  // Handle cardless players who forgot to declare Niko Kadi
+  // FIXED: Handle cardless players who forgot to declare Niko Kadi
   const currentPlayer = getCurrentPlayer(gameState);
   
   // If player is cardless and didn't declare Niko Kadi, they get a card on their turn
@@ -574,7 +526,7 @@ function findPlayableCardCombinations(hand: Card[], gameState: GameState): strin
     }
   }
   
-  // Same rank combinations
+  // Same rank combinations only
   const rankGroups = new Map<string, Card[]>();
   hand.forEach(card => {
     if (!rankGroups.has(card.rank)) {
@@ -594,30 +546,6 @@ function findPlayableCardCombinations(hand: Card[], gameState: GameState): strin
       }
     }
   });
-  
-  // Sequential combinations (for questions and mixed plays)
-  if (gameState.pendingQuestion || !gameState.drawStack) {
-    const sequentialCombos = findSequentialCombinations(hand, gameState);
-    combinations.push(...sequentialCombos);
-  }
-  
-  return combinations;
-}
-
-// Helper function to find sequential card combinations
-function findSequentialCombinations(hand: Card[], gameState: GameState): string[][] {
-  const combinations: string[][] = [];
-  const topCard = getTopCard(gameState);
-  
-  // Try combinations of 2-4 cards that can be played sequentially
-  for (let length = 2; length <= Math.min(4, hand.length); length++) {
-    for (let i = 0; i <= hand.length - length; i++) {
-      const cardIds = hand.slice(i, i + length).map(c => c.id);
-      if (canPlayerPlay(gameState, cardIds)) {
-        combinations.push(cardIds);
-      }
-    }
-  }
   
   return combinations;
 }

@@ -78,7 +78,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       <div className="mt-4 flex flex-wrap gap-4 justify-center text-sm">
         <div className="flex items-center space-x-2 text-white">
           <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-          <span>Selected: {selectedCards.length}/6</span>
+          <span>Selected: {selectedCards.length}</span>
         </div>
         
         {gameState.pendingQuestion && (
@@ -107,7 +107,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       {selectedCards.length > 1 && (
         <div className="mt-4 bg-blue-500 bg-opacity-20 border border-blue-400 border-opacity-30 rounded-lg p-3">
           <div className="text-blue-200 text-sm text-center">
-            <strong>💡 Tip:</strong> Playing multiple cards - they'll be played in sequence!
+            <strong>💡 Tip:</strong> Playing multiple cards - they must all be the same rank!
           </div>
         </div>
       )}
