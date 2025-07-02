@@ -46,10 +46,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [challenges, setChallenges] = useState<GameChallenge[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges' | 'admin'>('friends');
+  const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges' | 'admin'>('admin');
   const [error, setError] = useState<AppError | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
   const [challengingUsers, setChallenging] = useState<Set<string>>(new Set());
+  const [clearingData, setClearingData] = useState(false);
 
   // Use refs to track active listeners and prevent multiple subscriptions
   const challengesUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -530,29 +531,87 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     }
   };
 
-  const clearAllChallenges = async () => {
+  const clearAllData = async () => {
     if (!user) return;
+
+    setClearingData(true);
+    setError(null);
 
     try {
       await ErrorHandler.withRetry(async () => {
+        // Clear all challenges
         const challengesRef = collection(db, 'challenges');
-        const snapshot = await getDocs(challengesRef);
+        const challengesSnapshot = await getDocs(challengesRef);
         
-        const deletePromises: Promise<void>[] = [];
-        snapshot.forEach((challengeDoc) => {
-          deletePromises.push(deleteDoc(doc(db, 'challenges', challengeDoc.id)));
+        const challengeDeletePromises: Promise<void>[] = [];
+        challengesSnapshot.forEach((challengeDoc) => {
+          challengeDeletePromises.push(deleteDoc(doc(db, 'challenges', challengeDoc.id)));
         });
 
-        await Promise.all(deletePromises);
-      }, 'clearing all challenges');
+        // Clear all friend requests
+        const friendRequestsRef = collection(db, 'friendRequests');
+        const friendRequestsSnapshot = await getDocs(friendRequestsRef);
+        
+        const requestDeletePromises: Promise<void>[] = [];
+        friendRequestsSnapshot.forEach((requestDoc) => {
+          requestDeletePromises.push(deleteDoc(doc(db, 'friendRequests', requestDoc.id)));
+        });
+
+        // Clear all game sessions
+        const gameSessionsRef = collection(db, 'gameSessions');
+        const gameSessionsSnapshot = await getDocs(gameSessionsRef);
+        
+        const sessionDeletePromises: Promise<void>[] = [];
+        gameSessionsSnapshot.forEach((sessionDoc) => {
+          sessionDeletePromises.push(deleteDoc(doc(db, 'gameSessions', sessionDoc.id)));
+        });
+
+        // Clear all game moves
+        const gameMovesRef = collection(db, 'gameMoves');
+        const gameMovesSnapshot = await getDocs(gameMovesRef);
+        
+        const moveDeletePromises: Promise<void>[] = [];
+        gameMovesSnapshot.forEach((moveDoc) => {
+          moveDeletePromises.push(deleteDoc(doc(db, 'gameMoves', moveDoc.id)));
+        });
+
+        // Clear friends from all users
+        const usersRef = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersRef);
+        
+        const userUpdatePromises: Promise<void>[] = [];
+        usersSnapshot.forEach((userDoc) => {
+          userUpdatePromises.push(updateDoc(doc(db, 'users', userDoc.id), {
+            friends: []
+          }));
+        });
+
+        // Execute all deletions and updates
+        await Promise.all([
+          ...challengeDeletePromises,
+          ...requestDeletePromises,
+          ...sessionDeletePromises,
+          ...moveDeletePromises,
+          ...userUpdatePromises
+        ]);
+
+        // Reset local state
+        setChallenges([]);
+        setFriendRequests([]);
+        setSentRequests([]);
+        setFriends([]);
+        
+        console.log('Successfully cleared all data');
+      }, 'clearing all data');
       
-      setError(null);
       setConnectionStatus('connected');
       
     } catch (error: any) {
-      const appError = ErrorHandler.handleFirebaseError(error, 'clearing challenges');
+      const appError = ErrorHandler.handleFirebaseError(error, 'clearing all data');
       setError(appError);
       setConnectionStatus('disconnected');
+    } finally {
+      setClearingData(false);
     }
   };
 
@@ -598,6 +657,17 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           {/* Tabs */}
           <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 mb-6">
             <button
+              onClick={() => setActiveTab('admin')}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                activeTab === 'admin'
+                  ? 'bg-white text-red-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Trash2 size={16} className="inline mr-2" />
+              Admin
+            </button>
+            <button
               onClick={() => setActiveTab('friends')}
               className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
                 activeTab === 'friends'
@@ -641,17 +711,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
               <Search size={16} className="inline mr-2" />
               Browse ({filteredUsers.length})
             </button>
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                activeTab === 'admin'
-                  ? 'bg-white text-red-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Trash2 size={16} className="inline mr-2" />
-              Admin
-            </button>
           </div>
 
           {/* Error Message */}
@@ -678,19 +737,33 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           {activeTab === 'admin' && (
             <div className="space-y-4">
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="font-semibold text-red-800 mb-2">⚠️ Admin Actions</h4>
+                <h4 className="font-semibold text-red-800 mb-2">⚠️ CLEAR ALL DATA</h4>
                 <p className="text-sm text-red-700 mb-4">
-                  These actions will permanently delete data from the system. Use with caution.
+                  This will permanently delete ALL data from the system:
                 </p>
+                <ul className="text-sm text-red-700 mb-4 space-y-1 list-disc list-inside">
+                  <li>All friend requests (sent and received)</li>
+                  <li>All game challenges</li>
+                  <li>All friend connections</li>
+                  <li>All game sessions</li>
+                  <li>All game moves history</li>
+                </ul>
                 
                 <button
-                  onClick={clearAllChallenges}
-                  disabled={connectionStatus !== 'connected'}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  onClick={clearAllData}
+                  disabled={connectionStatus !== 'connected' || clearingData}
+                  className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-bold"
                 >
                   <Trash2 size={16} />
-                  <span>Clear All Challenges</span>
+                  <span>{clearingData ? 'Clearing All Data...' : 'CLEAR ALL DATA NOW'}</span>
+                  {clearingData && <RefreshCw size={16} className="animate-spin" />}
                 </button>
+                
+                {clearingData && (
+                  <div className="mt-3 text-sm text-red-600">
+                    Please wait while we clear all data from the system...
+                  </div>
+                )}
               </div>
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
