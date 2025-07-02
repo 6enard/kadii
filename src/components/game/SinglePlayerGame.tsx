@@ -16,7 +16,7 @@ import { GameBoard } from '../GameBoard';
 import { GameControls } from '../GameControls';
 import { SuitSelector } from '../SuitSelector';
 import { GameStatus } from '../GameStatus';
-import { ArrowLeft, Settings, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Settings, Volume2, VolumeX, Sparkles } from 'lucide-react';
 
 interface SinglePlayerGameProps {
   onBackToMenu: () => void;
@@ -121,96 +121,119 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     .map(card => card.id) : [];
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Compact Header */}
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={onBackToMenu}
-            className="flex items-center space-x-2 text-white hover:text-green-100 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            <span>Back to Menu</span>
-          </button>
-          
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">Kadi vs Computer</h1>
-            <p className="text-green-100 text-sm">Kenyan Card Game</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-emerald-500/5 to-yellow-500/5 rounded-full blur-3xl animate-spin" style={{ animationDuration: '20s' }}></div>
+      </div>
+      
+      <div className="relative z-10 p-4 sm:p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Casino-style Header */}
+          <div className="flex flex-col sm:flex-row items-center justify-between mb-6 bg-black/40 backdrop-blur-md rounded-2xl border border-yellow-500/30 p-4 shadow-2xl">
+            <button
+              onClick={onBackToMenu}
+              className="flex items-center space-x-2 text-yellow-400 hover:text-yellow-300 transition-colors font-medium mb-4 sm:mb-0"
+            >
+              <ArrowLeft size={20} />
+              <span>Back to Lobby</span>
+            </button>
+            
+            <div className="text-center mb-4 sm:mb-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 flex items-center justify-center space-x-2">
+                <Sparkles size={24} className="text-yellow-400" />
+                <span>KADI CASINO</span>
+                <Sparkles size={24} className="text-yellow-400" />
+              </h1>
+              <p className="text-emerald-300 text-sm font-medium">vs Computer • Premium Gaming</p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-3 rounded-xl bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white transition-all shadow-lg"
+              >
+                {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              </button>
+              
+              <button
+                onClick={() => setShowDifficultyModal(true)}
+                className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white transition-all text-sm font-medium shadow-lg"
+              >
+                <Settings size={16} />
+                <span className="hidden sm:inline">{gameState.aiDifficulty}</span>
+              </button>
+              
+              <button
+                onClick={handleNewGame}
+                className="px-4 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold rounded-xl transition-all text-sm shadow-lg border border-yellow-400/50"
+              >
+                New Game
+              </button>
+            </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all"
-            >
-              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            </button>
+          {/* Responsive Casino Game Layout */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
+            {/* Computer Hand - Top on mobile, Left on desktop */}
+            <div className="xl:col-span-1 order-1 xl:order-1">
+              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-2xl border border-red-500/30 shadow-2xl">
+                <PlayerHand
+                  player={gameState.players[1]}
+                  isCurrentPlayer={gameState.currentPlayerIndex === 1}
+                  selectedCards={[]}
+                  playableCards={[]}
+                  onCardClick={() => {}}
+                  isMyTurn={false}
+                  hideCards={true}
+                />
+              </div>
+            </div>
             
-            <button
-              onClick={() => setShowDifficultyModal(true)}
-              className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all text-sm"
-            >
-              <Settings size={16} />
-              <span>{gameState.aiDifficulty}</span>
-            </button>
+            {/* Game Board and Controls - Center */}
+            <div className="xl:col-span-1 order-2 xl:order-2 space-y-4">
+              <div className="bg-gradient-to-br from-emerald-800/80 via-emerald-900/80 to-emerald-800/80 backdrop-blur-md rounded-2xl border border-emerald-500/30 shadow-2xl">
+                <GameBoard
+                  gameState={gameState}
+                  onDrawCard={handleDrawCard}
+                />
+              </div>
+              
+              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-2xl border border-yellow-500/30 shadow-2xl">
+                <GameControls
+                  gameState={gameState}
+                  selectedCards={selectedCards}
+                  onPlayCards={handlePlayCards}
+                  onDeclareNikoKadi={handleDeclareNikoKadi}
+                  onDrawPenalty={handleDrawPenalty}
+                  canPlaySelected={canPlaySelected}
+                />
+              </div>
+            </div>
             
-            <button
-              onClick={handleNewGame}
-              className="px-3 py-2 bg-white text-green-600 font-semibold rounded-lg hover:bg-gray-100 transition-all text-sm"
-            >
-              New Game
-            </button>
+            {/* Player Hand - Bottom on mobile, Right on desktop */}
+            <div className="xl:col-span-1 order-3 xl:order-3">
+              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-2xl border border-blue-500/30 shadow-2xl">
+                <PlayerHand
+                  player={gameState.players[0]}
+                  isCurrentPlayer={gameState.currentPlayerIndex === 0}
+                  selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
+                  playableCards={playableCards}
+                  onCardClick={handleCardClick}
+                  isMyTurn={!isComputerTurn}
+                  hideCards={false}
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Game Status */}
+          <div className="mt-6">
+            <GameStatus gameState={gameState} onNewGame={handleNewGame} />
           </div>
         </div>
-        
-        {/* Compact Game Layout - Chess.com style */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-8rem)]">
-          {/* Left Column - Computer Hand */}
-          <div className="lg:col-span-1 flex flex-col">
-            <PlayerHand
-              player={gameState.players[1]}
-              isCurrentPlayer={gameState.currentPlayerIndex === 1}
-              selectedCards={[]}
-              playableCards={[]}
-              onCardClick={() => {}}
-              isMyTurn={false}
-              hideCards={true} // Hide computer cards
-            />
-          </div>
-          
-          {/* Center Column - Game Board and Controls */}
-          <div className="lg:col-span-1 flex flex-col space-y-4">
-            <GameBoard
-              gameState={gameState}
-              onDrawCard={handleDrawCard}
-            />
-            
-            <GameControls
-              gameState={gameState}
-              selectedCards={selectedCards}
-              onPlayCards={handlePlayCards}
-              onDeclareNikoKadi={handleDeclareNikoKadi}
-              onDrawPenalty={handleDrawPenalty}
-              canPlaySelected={canPlaySelected}
-            />
-          </div>
-          
-          {/* Right Column - Player Hand */}
-          <div className="lg:col-span-1 flex flex-col">
-            <PlayerHand
-              player={gameState.players[0]}
-              isCurrentPlayer={gameState.currentPlayerIndex === 0}
-              selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
-              playableCards={playableCards}
-              onCardClick={handleCardClick}
-              isMyTurn={!isComputerTurn}
-              hideCards={false}
-            />
-          </div>
-        </div>
-        
-        {/* Game Status */}
-        <GameStatus gameState={gameState} onNewGame={handleNewGame} />
       </div>
       
       {/* Suit Selector Modal */}
@@ -218,59 +241,65 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
         <SuitSelector onSelectSuit={handleSelectSuit} />
       )}
       
-      {/* Difficulty Modal */}
+      {/* Casino-style Difficulty Modal */}
       {showDifficultyModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl border border-white/20 max-w-md w-full overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 text-white">
-              <h3 className="text-xl font-bold">Game Settings</h3>
-              <p className="text-emerald-100 text-sm mt-1">Choose AI difficulty level</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border-2 border-purple-500/50 max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 p-6 text-white relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 animate-pulse"></div>
+              <div className="relative z-10">
+                <h3 className="text-2xl font-bold flex items-center space-x-2">
+                  <Settings size={24} />
+                  <span>Game Settings</span>
+                </h3>
+                <p className="text-purple-100 text-sm mt-1">Choose your challenge level</p>
+              </div>
             </div>
             
             <div className="p-6 space-y-4">
               <button
                 onClick={() => handleDifficultyChange('easy')}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left transform hover:scale-105 ${
                   gameState.aiDifficulty === 'easy' 
-                    ? 'border-green-500 bg-green-500/10 text-white' 
-                    : 'border-white/20 hover:border-green-400 text-white/80 hover:text-white'
+                    ? 'border-green-500 bg-green-500/20 text-white shadow-lg shadow-green-500/25' 
+                    : 'border-white/20 hover:border-green-400 text-white/80 hover:text-white bg-black/20'
                 }`}
               >
-                <h4 className="font-bold text-green-400">🟢 Easy</h4>
-                <p className="text-sm text-white/60 mt-1">Computer plays randomly</p>
+                <h4 className="font-bold text-green-400 text-lg">🟢 Beginner</h4>
+                <p className="text-sm text-white/60 mt-1">Relaxed gameplay • Perfect for learning</p>
               </button>
               
               <button
                 onClick={() => handleDifficultyChange('medium')}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left transform hover:scale-105 ${
                   gameState.aiDifficulty === 'medium' 
-                    ? 'border-yellow-500 bg-yellow-500/10 text-white' 
-                    : 'border-white/20 hover:border-yellow-400 text-white/80 hover:text-white'
+                    ? 'border-yellow-500 bg-yellow-500/20 text-white shadow-lg shadow-yellow-500/25' 
+                    : 'border-white/20 hover:border-yellow-400 text-white/80 hover:text-white bg-black/20'
                 }`}
               >
-                <h4 className="font-bold text-yellow-400">🟡 Medium</h4>
-                <p className="text-sm text-white/60 mt-1">Computer uses basic strategy</p>
+                <h4 className="font-bold text-yellow-400 text-lg">🟡 Professional</h4>
+                <p className="text-sm text-white/60 mt-1">Balanced challenge • Strategic gameplay</p>
               </button>
               
               <button
                 onClick={() => handleDifficultyChange('hard')}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left transform hover:scale-105 ${
                   gameState.aiDifficulty === 'hard' 
-                    ? 'border-red-500 bg-red-500/10 text-white' 
-                    : 'border-white/20 hover:border-red-400 text-white/80 hover:text-white'
+                    ? 'border-red-500 bg-red-500/20 text-white shadow-lg shadow-red-500/25' 
+                    : 'border-white/20 hover:border-red-400 text-white/80 hover:text-white bg-black/20'
                 }`}
               >
-                <h4 className="font-bold text-red-400">🔴 Hard</h4>
-                <p className="text-sm text-white/60 mt-1">Computer plays strategically</p>
+                <h4 className="font-bold text-red-400 text-lg">🔴 Master</h4>
+                <p className="text-sm text-white/60 mt-1">Ultimate challenge • Expert AI</p>
               </button>
             </div>
             
-            <div className="p-4 border-t border-white/10">
+            <div className="p-4 border-t border-white/10 bg-black/40">
               <button
                 onClick={() => setShowDifficultyModal(false)}
-                className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors"
+                className="w-full px-4 py-3 bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-xl transition-all font-medium"
               >
-                Close
+                Apply Settings
               </button>
             </div>
           </div>
