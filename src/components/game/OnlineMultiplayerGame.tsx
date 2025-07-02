@@ -15,7 +15,10 @@ import { GameBoard } from '../GameBoard';
 import { GameControls } from '../GameControls';
 import { SuitSelector } from '../SuitSelector';
 import { GameStatus } from '../GameStatus';
-import { ArrowLeft, Volume2, VolumeX, Users, Sparkles, Wifi, WifiOff, Clock, AlertTriangle } from 'lucide-react';
+import { ConnectionStatus } from '../common/ConnectionStatus';
+import { GameErrorFallback } from '../common/ErrorBoundary';
+import { ErrorHandler, AppError } from '../../utils/errorHandling';
+import { ArrowLeft, Volume2, VolumeX, Users, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   doc, 
@@ -24,7 +27,9 @@ import {
   addDoc, 
   collection, 
   serverTimestamp,
-  getDoc 
+  getDoc,
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
@@ -45,19 +50,28 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'reconnecting'>('connecting');
   const [opponentOnline, setOpponentOnline] = useState(true);
   const [gameSession, setGameSession] = useState<OnlineGameSession | null>(null);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<AppError | null>(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [gameError, setGameError] = useState<Error | null>(null);
   
   // Use refs to track listeners and prevent multiple subscriptions
   const gameUnsubscribeRef = useRef<(() => void) | null>(null);
-  const movesUnsubscribeRef = useRef<(() => void) | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastHeartbeatRef = useRef<Date>(new Date());
 
   useEffect(() => {
     if (!user || !gameSessionId) {
-      setError('Invalid game session');
+      setError({
+        code: 'invalid-session',
+        message: 'Invalid game session',
+        userMessage: 'Invalid game session. Please try starting a new game.',
+        retryable: false,
+        severity: 'high'
+      });
       return;
     }
 
@@ -80,114 +94,187 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       gameUnsubscribeRef.current();
       gameUnsubscribeRef.current = null;
     }
-    if (movesUnsubscribeRef.current) {
-      movesUnsubscribeRef.current();
-      movesUnsubscribeRef.current = null;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
   };
 
   const setupGameListeners = async () => {
     try {
       setConnectionStatus('connecting');
+      setError(null);
       
-      // Listen to game session changes
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+      }, 'enable-network');
+
       const gameSessionRef = doc(db, 'gameSessions', gameSessionId);
       
       gameUnsubscribeRef.current = onSnapshot(gameSessionRef, (doc) => {
-        if (doc.exists()) {
-          const session = { id: doc.id, ...doc.data() } as OnlineGameSession;
-          setGameSession(session);
-          
-          if (session.gameState) {
-            setGameState(session.gameState);
-          }
-          
-          setConnectionStatus('connected');
-          setError('');
-          
-          // Check if opponent is still online (simplified check)
-          const now = new Date();
-          const lastMove = session.lastMoveAt?.toDate?.() || session.lastMoveAt;
-          if (lastMove && now.getTime() - lastMove.getTime() > 60000) { // 1 minute
-            setOpponentOnline(false);
+        try {
+          if (doc.exists()) {
+            const session = { id: doc.id, ...doc.data() } as OnlineGameSession;
+            setGameSession(session);
+            
+            if (session.gameState) {
+              setGameState(session.gameState);
+            }
+            
+            setConnectionStatus('connected');
+            setError(null);
+            lastHeartbeatRef.current = new Date();
+            
+            // Check opponent online status
+            const now = new Date();
+            const lastMove = session.lastMoveAt?.toDate?.() || session.lastMoveAt;
+            if (lastMove && now.getTime() - lastMove.getTime() > 120000) { // 2 minutes
+              setOpponentOnline(false);
+            } else {
+              setOpponentOnline(true);
+            }
           } else {
-            setOpponentOnline(true);
+            throw new Error('Game session not found');
           }
-        } else {
-          setError('Game session not found');
-          setConnectionStatus('disconnected');
+        } catch (err) {
+          console.error('Error processing game session update:', err);
+          setGameError(err as Error);
         }
       }, (error) => {
         console.error('Error listening to game session:', error);
-        setError('Connection lost. Trying to reconnect...');
+        const appError = ErrorHandler.handleFirebaseError(error, 'listening to game session');
+        setError(appError);
         setConnectionStatus('disconnected');
+        
+        if (appError.retryable) {
+          scheduleReconnect();
+        }
       });
 
     } catch (error: any) {
       console.error('Error setting up game listeners:', error);
-      setError('Failed to connect to game');
+      const appError = ErrorHandler.handleFirebaseError(error, 'setting up game listeners');
+      setError(appError);
       setConnectionStatus('disconnected');
+      
+      if (appError.retryable) {
+        scheduleReconnect();
+      }
     }
   };
 
+  const scheduleReconnect = () => {
+    if (reconnectTimeoutRef.current) return;
+    
+    setConnectionStatus('reconnecting');
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectTimeoutRef.current = null;
+      setupGameListeners();
+    }, 5000);
+  };
+
   const makeMove = async (moveType: string, data: any = {}) => {
-    if (!user || !gameState || !gameSession) return;
+    if (!user || !gameState || !gameSession) {
+      setError({
+        code: 'invalid-state',
+        message: 'Invalid game state',
+        userMessage: 'Game is not ready. Please wait or refresh.',
+        retryable: true,
+        severity: 'medium'
+      });
+      return;
+    }
+
+    if (!isMyTurn) {
+      setError({
+        code: 'not-your-turn',
+        message: 'Not your turn',
+        userMessage: 'Please wait for your turn.',
+        retryable: false,
+        severity: 'low'
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
 
     try {
-      // Create the move record
-      const move: Partial<GameMove> = {
-        gameId: gameSessionId,
-        playerId: user.uid,
-        playerName: user.displayName || 'Player',
-        moveType: moveType as any,
-        timestamp: new Date(),
-        ...data
-      };
+      await ErrorHandler.withRetry(async () => {
+        // Create the move record
+        const move: Partial<GameMove> = {
+          gameId: gameSessionId,
+          playerId: user.uid,
+          playerName: user.displayName || 'Player',
+          moveType: moveType as any,
+          timestamp: new Date(),
+          ...data
+        };
 
-      // Apply the move locally first for immediate feedback
-      let newGameState = { ...gameState };
-      
-      switch (moveType) {
-        case 'playCards':
-          newGameState = playCards(gameState, { cardIds: data.cardIds, declaredSuit: data.declaredSuit });
-          break;
-        case 'drawCard':
-          newGameState = drawCard(gameState, gameState.currentPlayerIndex);
-          break;
-        case 'declareNikoKadi':
-          newGameState = declareNikoKadi(gameState);
-          break;
-        case 'selectSuit':
-          newGameState = selectSuit(gameState, data.selectedSuit);
-          break;
-        case 'drawPenalty':
-          newGameState = handlePenaltyDraw(gameState);
-          break;
-      }
+        // Apply the move locally first for immediate feedback
+        let newGameState = { ...gameState };
+        
+        try {
+          switch (moveType) {
+            case 'playCards':
+              newGameState = playCards(gameState, { cardIds: data.cardIds, declaredSuit: data.declaredSuit });
+              break;
+            case 'drawCard':
+              newGameState = drawCard(gameState, gameState.currentPlayerIndex);
+              break;
+            case 'declareNikoKadi':
+              newGameState = declareNikoKadi(gameState);
+              break;
+            case 'selectSuit':
+              newGameState = selectSuit(gameState, data.selectedSuit);
+              break;
+            case 'drawPenalty':
+              newGameState = handlePenaltyDraw(gameState);
+              break;
+            default:
+              throw new Error(`Unknown move type: ${moveType}`);
+          }
+        } catch (gameLogicError) {
+          throw new Error(`Invalid move: ${(gameLogicError as Error).message}`);
+        }
 
-      move.gameStateAfter = newGameState;
+        move.gameStateAfter = newGameState;
 
-      // Update the game session in Firestore
-      await updateDoc(doc(db, 'gameSessions', gameSessionId), {
-        gameState: newGameState,
-        lastMoveAt: serverTimestamp(),
-        status: newGameState.gamePhase === 'gameOver' ? 'completed' : 'active',
-        winner: newGameState.winner || null
-      });
+        // Update the game session in Firestore
+        await updateDoc(doc(db, 'gameSessions', gameSessionId), {
+          gameState: newGameState,
+          lastMoveAt: serverTimestamp(),
+          status: newGameState.gamePhase === 'gameOver' ? 'completed' : 'active',
+          winner: newGameState.winner || null
+        });
 
-      // Add the move to the moves collection for history
-      await addDoc(collection(db, 'gameMoves'), move);
+        // Add the move to the moves collection for history
+        await addDoc(collection(db, 'gameMoves'), move);
+      }, `making ${moveType} move`);
 
       setSelectedCards([]);
       
     } catch (error: any) {
       console.error('Error making move:', error);
-      setError('Failed to make move. Please try again.');
+      if (error instanceof Error && error.message.includes('Invalid move')) {
+        setError({
+          code: 'invalid-move',
+          message: error.message,
+          userMessage: error.message,
+          retryable: false,
+          severity: 'low'
+        });
+      } else {
+        const appError = ErrorHandler.handleFirebaseError(error, 'making move');
+        setError(appError);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleCardClick = useCallback((cardId: string) => {
-    if (!isMyTurn || gameState?.gamePhase !== 'playing') return;
+    if (!isMyTurn || gameState?.gamePhase !== 'playing' || isLoading) return;
     
     setSelectedCards(prev => {
       if (prev.includes(cardId)) {
@@ -200,112 +287,174 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
         }
       }
     });
-  }, [isMyTurn, gameState?.gamePhase]);
+  }, [isMyTurn, gameState?.gamePhase, isLoading]);
 
   const handlePlayCards = useCallback(() => {
-    if (selectedCards.length === 0 || !isMyTurn) return;
+    if (selectedCards.length === 0 || !isMyTurn || isLoading) return;
     makeMove('playCards', { cardIds: selectedCards });
-  }, [selectedCards, isMyTurn]);
+  }, [selectedCards, isMyTurn, isLoading]);
 
   const handleDrawCard = useCallback(() => {
-    if (!isMyTurn) return;
+    if (!isMyTurn || isLoading) return;
     
     if (gameState?.drawStack && gameState.drawStack > 0) {
       makeMove('drawPenalty');
     } else {
       makeMove('drawCard');
     }
-  }, [isMyTurn, gameState?.drawStack]);
+  }, [isMyTurn, gameState?.drawStack, isLoading]);
 
   const handleDeclareNikoKadi = useCallback(() => {
-    if (!isMyTurn) return;
+    if (!isMyTurn || isLoading) return;
     makeMove('declareNikoKadi');
-  }, [isMyTurn]);
+  }, [isMyTurn, isLoading]);
 
   const handleSelectSuit = useCallback((suit: Suit) => {
+    if (isLoading) return;
     makeMove('selectSuit', { selectedSuit: suit });
-  }, []);
+  }, [isLoading]);
 
   const handleNewGame = useCallback(async () => {
-    if (!user || !gameSession) return;
+    if (!user || !gameSession || isLoading) return;
     
-    try {
-      // Only the host can start a new game
-      if (gameSession.hostId !== user.uid) {
-        setError('Only the host can start a new game');
-        return;
-      }
-
-      const newGameState = initializeGame();
-      newGameState.isOnlineGame = true;
-      newGameState.gameId = gameSessionId;
-      newGameState.hostId = gameSession.hostId;
-      
-      // Set up players with correct IDs
-      newGameState.players[0] = {
-        id: gameSession.hostId,
-        name: gameSession.hostName,
-        hand: newGameState.players[0].hand,
-        nikoKadiCalled: false,
-        isOnline: true
-      };
-      
-      newGameState.players[1] = {
-        id: gameSession.guestId,
-        name: gameSession.guestName,
-        hand: newGameState.players[1].hand,
-        nikoKadiCalled: false,
-        isOnline: true
-      };
-
-      await updateDoc(doc(db, 'gameSessions', gameSessionId), {
-        gameState: newGameState,
-        status: 'active',
-        lastMoveAt: serverTimestamp(),
-        winner: null
+    if (gameSession.hostId !== user.uid) {
+      setError({
+        code: 'not-host',
+        message: 'Only host can start new game',
+        userMessage: 'Only the host can start a new game.',
+        retryable: false,
+        severity: 'low'
       });
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await ErrorHandler.withRetry(async () => {
+        const newGameState = initializeGame();
+        newGameState.isOnlineGame = true;
+        newGameState.gameId = gameSessionId;
+        newGameState.hostId = gameSession.hostId;
+        
+        // Set up players with correct IDs
+        newGameState.players[0] = {
+          id: gameSession.hostId,
+          name: gameSession.hostName,
+          hand: newGameState.players[0].hand,
+          nikoKadiCalled: false,
+          isOnline: true
+        };
+        
+        newGameState.players[1] = {
+          id: gameSession.guestId,
+          name: gameSession.guestName,
+          hand: newGameState.players[1].hand,
+          nikoKadiCalled: false,
+          isOnline: true
+        };
+
+        await updateDoc(doc(db, 'gameSessions', gameSessionId), {
+          gameState: newGameState,
+          status: 'active',
+          lastMoveAt: serverTimestamp(),
+          winner: null
+        });
+      }, 'starting new game');
 
       setSelectedCards([]);
       
     } catch (error: any) {
       console.error('Error starting new game:', error);
-      setError('Failed to start new game');
+      const appError = ErrorHandler.handleFirebaseError(error, 'starting new game');
+      setError(appError);
+    } finally {
+      setIsLoading(false);
     }
-  }, [user, gameSession, gameSessionId]);
+  }, [user, gameSession, gameSessionId, isLoading]);
 
   const handleDrawPenalty = useCallback(() => {
-    if (!isMyTurn) return;
+    if (!isMyTurn || isLoading) return;
     makeMove('drawPenalty');
-  }, [isMyTurn]);
+  }, [isMyTurn, isLoading]);
 
   const handleLeaveGame = useCallback(async () => {
     try {
       if (gameSession && user) {
-        await updateDoc(doc(db, 'gameSessions', gameSessionId), {
-          status: 'abandoned',
-          lastMoveAt: serverTimestamp()
-        });
+        await ErrorHandler.withRetry(async () => {
+          await updateDoc(doc(db, 'gameSessions', gameSessionId), {
+            status: 'abandoned',
+            lastMoveAt: serverTimestamp()
+          });
+        }, 'leaving game');
       }
     } catch (error) {
       console.error('Error leaving game:', error);
+      // Don't show error for leaving game, just go back
     }
     onBackToMenu();
   }, [gameSession, user, gameSessionId, onBackToMenu]);
 
+  const handleRetryConnection = useCallback(() => {
+    setError(null);
+    setConnectionStatus('connecting');
+    setupGameListeners();
+  }, []);
+
+  const handleGameErrorRetry = useCallback(() => {
+    setGameError(null);
+    setError(null);
+    handleRetryConnection();
+  }, [handleRetryConnection]);
+
+  // Show game error boundary if there's a critical game error
+  if (gameError) {
+    return (
+      <GameErrorFallback 
+        error={gameError} 
+        retry={handleGameErrorRetry}
+        onGoHome={onBackToMenu}
+      />
+    );
+  }
+
   if (!gameState) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md mx-auto p-6">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <h2 className="text-2xl font-bold text-white mb-2">
-            {connectionStatus === 'connecting' ? 'Connecting to game...' : 'Loading game...'}
+            {connectionStatus === 'connecting' ? 'Connecting to game...' : 
+             connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Loading game...'}
           </h2>
-          <p className="text-purple-300">Please wait while we set up your online match</p>
+          <p className="text-purple-300 mb-4">Please wait while we set up your online match</p>
+          
           {error && (
-            <div className="mt-4 bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-200">
-              {error}
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertTriangle size={16} className="text-red-400" />
+                <span className="text-red-200 font-medium">Connection Error</span>
+              </div>
+              <p className="text-red-200 text-sm mb-3">{error.userMessage}</p>
+              {error.retryable && (
+                <button
+                  onClick={handleRetryConnection}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors mx-auto"
+                >
+                  <RefreshCw size={16} />
+                  <span>Retry</span>
+                </button>
+              )}
             </div>
           )}
+          
+          <button
+            onClick={onBackToMenu}
+            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+          >
+            Back to Menu
+          </button>
         </div>
       </div>
     );
@@ -348,18 +497,14 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
                 <span>ONLINE KADI</span>
                 <Sparkles size={16} className="text-blue-400 sm:w-6 sm:h-6" />
               </h1>
-              <div className="flex items-center justify-center space-x-2 text-xs sm:text-sm">
+              <div className="flex items-center justify-center space-x-4 text-xs sm:text-sm">
                 <span className="text-purple-300 font-medium">vs {opponentName}</span>
-                <div className="flex items-center space-x-1">
-                  {connectionStatus === 'connected' ? (
-                    <Wifi size={12} className="text-green-400 sm:w-4 sm:h-4" />
-                  ) : (
-                    <WifiOff size={12} className="text-red-400 sm:w-4 sm:h-4" />
-                  )}
-                  <span className={connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}>
-                    {connectionStatus}
-                  </span>
-                </div>
+                <ConnectionStatus 
+                  isConnected={connectionStatus === 'connected'}
+                  isReconnecting={connectionStatus === 'reconnecting'}
+                  lastError={error?.userMessage}
+                  onRetry={handleRetryConnection}
+                />
               </div>
             </div>
             
@@ -374,39 +519,59 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
               {gameSession?.hostId === user?.uid && (
                 <button
                   onClick={handleNewGame}
-                  className="px-2 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold rounded-lg sm:rounded-xl transition-all text-xs sm:text-sm shadow-lg border border-purple-400/50 touch-manipulation"
+                  disabled={isLoading}
+                  className="px-2 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold rounded-lg sm:rounded-xl transition-all text-xs sm:text-sm shadow-lg border border-purple-400/50 touch-manipulation disabled:opacity-50"
                 >
-                  New Game
+                  {isLoading ? 'Starting...' : 'New Game'}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Connection Status & Turn Indicator */}
-          {(error || !opponentOnline || !isMyTurn) && (
-            <div className="mb-4 sm:mb-6">
-              {error && (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-3 flex items-center space-x-2">
+          {/* Status Messages */}
+          <div className="mb-4 sm:mb-6 space-y-2">
+            {error && error.severity !== 'low' && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
                   <AlertTriangle size={16} className="text-red-400" />
-                  <span className="text-red-200 text-sm">{error}</span>
+                  <span className="text-red-200 text-sm">{error.userMessage}</span>
                 </div>
-              )}
-              
-              {!opponentOnline && (
-                <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 mb-3 flex items-center space-x-2">
-                  <Clock size={16} className="text-yellow-400" />
-                  <span className="text-yellow-200 text-sm">Opponent appears to be offline</span>
-                </div>
-              )}
-              
-              {!isMyTurn && !error && (
-                <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span className="text-blue-200 text-sm font-medium">Waiting for {opponentName}'s move...</span>
-                </div>
-              )}
-            </div>
-          )}
+                {error.retryable && (
+                  <button
+                    onClick={handleRetryConnection}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition-colors"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {!opponentOnline && connectionStatus === 'connected' && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 flex items-center space-x-2">
+                <AlertTriangle size={16} className="text-yellow-400" />
+                <span className="text-yellow-200 text-sm">
+                  {opponentName} appears to be offline. The game will continue when they reconnect.
+                </span>
+              </div>
+            )}
+            
+            {!isMyTurn && !error && connectionStatus === 'connected' && (
+              <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 flex items-center justify-center space-x-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <span className="text-blue-200 text-sm font-medium">
+                  Waiting for {opponentName}'s move...
+                </span>
+              </div>
+            )}
+
+            {isLoading && (
+              <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-3 flex items-center justify-center space-x-2">
+                <RefreshCw size={16} className="text-purple-400 animate-spin" />
+                <span className="text-purple-200 text-sm font-medium">Processing move...</span>
+              </div>
+            )}
+          </div>
           
           {/* Responsive Casino Game Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
@@ -443,7 +608,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
                   onPlayCards={handlePlayCards}
                   onDeclareNikoKadi={handleDeclareNikoKadi}
                   onDrawPenalty={handleDrawPenalty}
-                  canPlaySelected={canPlaySelected && isMyTurn}
+                  canPlaySelected={canPlaySelected && isMyTurn && !isLoading}
                 />
               </div>
             </div>
@@ -458,7 +623,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
                     selectedCards={selectedCards}
                     playableCards={playableCards}
                     onCardClick={handleCardClick}
-                    isMyTurn={isMyTurn}
+                    isMyTurn={isMyTurn && !isLoading}
                     hideCards={false}
                   />
                 )}
@@ -474,7 +639,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       </div>
         
       {/* Suit Selector Modal */}
-      {gameState.gamePhase === 'selectingSuit' && isMyTurn && (
+      {gameState.gamePhase === 'selectingSuit' && isMyTurn && !isLoading && (
         <SuitSelector onSelectSuit={handleSelectSuit} />
       )}
     </div>

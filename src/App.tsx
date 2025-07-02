@@ -4,6 +4,7 @@ import { MainMenu } from './components/menu/MainMenu';
 import { SinglePlayerGame } from './components/game/SinglePlayerGame';
 import { MultiplayerGame } from './components/game/MultiplayerGame';
 import { OnlineMultiplayerGame } from './components/game/OnlineMultiplayerGame';
+import { ErrorFallback, createErrorBoundary } from './components/common/ErrorBoundary';
 
 type GameMode = 'menu' | 'singlePlayer' | 'multiplayer' | 'onlineMultiplayer';
 
@@ -12,6 +13,8 @@ interface OnlineGameData {
   opponentId: string;
   opponentName: string;
 }
+
+const AppErrorBoundary = createErrorBoundary(ErrorFallback);
 
 function App() {
   const [gameMode, setGameMode] = useState<GameMode>('menu');
@@ -36,29 +39,31 @@ function App() {
   };
 
   return (
-    <AuthProvider>
-      {gameMode === 'menu' && (
-        <MainMenu
-          onStartSinglePlayer={handleStartSinglePlayer}
-          onStartMultiplayer={handleStartMultiplayer}
-          onStartOnlineGame={handleStartOnlineGame}
-        />
-      )}
-      {gameMode === 'singlePlayer' && (
-        <SinglePlayerGame onBackToMenu={handleBackToMenu} />
-      )}
-      {gameMode === 'multiplayer' && (
-        <MultiplayerGame onBackToMenu={handleBackToMenu} />
-      )}
-      {gameMode === 'onlineMultiplayer' && onlineGameData && (
-        <OnlineMultiplayerGame 
-          onBackToMenu={handleBackToMenu}
-          gameSessionId={onlineGameData.gameSessionId}
-          opponentId={onlineGameData.opponentId}
-          opponentName={onlineGameData.opponentName}
-        />
-      )}
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        {gameMode === 'menu' && (
+          <MainMenu
+            onStartSinglePlayer={handleStartSinglePlayer}
+            onStartMultiplayer={handleStartMultiplayer}
+            onStartOnlineGame={handleStartOnlineGame}
+          />
+        )}
+        {gameMode === 'singlePlayer' && (
+          <SinglePlayerGame onBackToMenu={handleBackToMenu} />
+        )}
+        {gameMode === 'multiplayer' && (
+          <MultiplayerGame onBackToMenu={handleBackToMenu} />
+        )}
+        {gameMode === 'onlineMultiplayer' && onlineGameData && (
+          <OnlineMultiplayerGame 
+            onBackToMenu={handleBackToMenu}
+            gameSessionId={onlineGameData.gameSessionId}
+            opponentId={onlineGameData.opponentId}
+            opponentName={onlineGameData.opponentName}
+          />
+        )}
+      </AuthProvider>
+    </AppErrorBoundary>
   );
 }
 

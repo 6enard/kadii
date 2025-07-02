@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2, Crown, Zap } from 'lucide-react';
+import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2, AlertTriangle } from 'lucide-react';
 import { 
   collection, 
   query, 
@@ -23,6 +23,8 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserData, FriendRequest, GameChallenge, OnlineGameSession } from '../../types';
 import { initializeGame } from '../../utils/gameLogic';
+import { ErrorHandler, AppError } from '../../utils/errorHandling';
+import { ConnectionStatus } from '../common/ConnectionStatus';
 
 interface EnhancedFriendsModalProps {
   isOpen: boolean;
@@ -45,8 +47,8 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const [challenges, setChallenges] = useState<GameChallenge[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges' | 'admin'>('friends');
-  const [error, setError] = useState('');
-  const [isOffline, setIsOffline] = useState(false);
+  const [error, setError] = useState<AppError | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
   const [challengingUsers, setChallenging] = useState<Set<string>>(new Set());
 
   // Use refs to track active listeners and prevent multiple subscriptions
@@ -101,6 +103,9 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     cleanupListeners();
 
     try {
+      setConnectionStatus('connected');
+      setError(null);
+
       // Set up challenges listener
       const challengesQuery = query(
         collection(db, 'challenges'),
@@ -121,10 +126,12 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           } as GameChallenge);
         });
         setChallenges(incoming);
-        setIsOffline(false);
+        setConnectionStatus('connected');
       }, (error) => {
         console.error('Error in challenges listener:', error);
-        handleFirebaseError(error, 'loading challenges');
+        const appError = ErrorHandler.handleFirebaseError(error, 'loading challenges');
+        setError(appError);
+        setConnectionStatus('disconnected');
       });
 
       // Set up friend requests listener
@@ -141,10 +148,12 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           incoming.push({ id: doc.id, ...doc.data() } as FriendRequest);
         });
         setFriendRequests(incoming);
-        setIsOffline(false);
+        setConnectionStatus('connected');
       }, (error) => {
         console.error('Error in friend requests listener:', error);
-        handleFirebaseError(error, 'loading friend requests');
+        const appError = ErrorHandler.handleFirebaseError(error, 'loading friend requests');
+        setError(appError);
+        setConnectionStatus('disconnected');
       });
 
       // Set up sent requests listener
@@ -165,30 +174,19 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           return bTime.getTime() - aTime.getTime();
         });
         setSentRequests(sent);
-        setIsOffline(false);
+        setConnectionStatus('connected');
       }, (error) => {
         console.error('Error in sent requests listener:', error);
-        handleFirebaseError(error, 'loading sent requests');
+        const appError = ErrorHandler.handleFirebaseError(error, 'loading sent requests');
+        setError(appError);
+        setConnectionStatus('disconnected');
       });
 
     } catch (error: any) {
       console.error('Error setting up listeners:', error);
-      handleFirebaseError(error, 'setting up real-time listeners');
-    }
-  };
-
-  const handleFirebaseError = (error: any, operation: string) => {
-    console.error(`Error ${operation}:`, error);
-    
-    if (error.code === 'unavailable' || error.message?.includes('offline') || error.message?.includes('network')) {
-      setIsOffline(true);
-      setError(`Unable to connect to the server. Please check your internet connection and try again.`);
-    } else if (error.code === 'permission-denied') {
-      setError(`Access denied. Please make sure you're logged in and try again.`);
-    } else if (error.code === 'not-found') {
-      setError(`Data not found. The requested information may have been removed.`);
-    } else {
-      setError(`Error ${operation}. Please try again later.`);
+      const appError = ErrorHandler.handleFirebaseError(error, 'setting up real-time listeners');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -196,33 +194,36 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     setLoading(true);
-    setError('');
-    setIsOffline(false);
+    setError(null);
     
     try {
-      await enableNetwork(db);
-      
-      const usersRef = collection(db, 'users');
-      const allUsersSnapshot = await getDocs(usersRef);
-      const users: UserData[] = [];
-      
-      allUsersSnapshot.forEach((doc) => {
-        const userData = doc.data() as UserData;
-        if (userData.username) {
-          users.push({
-            id: doc.id,
-            ...userData
-          });
-        }
-      });
-      
-      users.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
-      
-      setAllUsers(users);
-      setFilteredUsers(users.filter(userData => userData.id !== user.uid));
-      setIsOffline(false);
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        
+        const usersRef = collection(db, 'users');
+        const allUsersSnapshot = await getDocs(usersRef);
+        const users: UserData[] = [];
+        
+        allUsersSnapshot.forEach((doc) => {
+          const userData = doc.data() as UserData;
+          if (userData.username) {
+            users.push({
+              id: doc.id,
+              ...userData
+            });
+          }
+        });
+        
+        users.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
+        
+        setAllUsers(users);
+        setFilteredUsers(users.filter(userData => userData.id !== user.uid));
+        setConnectionStatus('connected');
+      }, 'loading users');
     } catch (error: any) {
-      handleFirebaseError(error, 'loading users');
+      const appError = ErrorHandler.handleFirebaseError(error, 'loading users');
+      setError(appError);
+      setConnectionStatus('disconnected');
     } finally {
       setLoading(false);
     }
@@ -232,30 +233,34 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     try {
-      await enableNetwork(db);
-      
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
-      
-      if (userData?.friends?.length > 0) {
-        const friendsData: UserData[] = [];
-        for (const friendId of userData.friends) {
-          const friendDoc = await getDoc(doc(db, 'users', friendId));
-          if (friendDoc.exists()) {
-            friendsData.push({
-              id: friendDoc.id,
-              ...friendDoc.data()
-            } as UserData);
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const userData = userDoc.data();
+        
+        if (userData?.friends?.length > 0) {
+          const friendsData: UserData[] = [];
+          for (const friendId of userData.friends) {
+            const friendDoc = await getDoc(doc(db, 'users', friendId));
+            if (friendDoc.exists()) {
+              friendsData.push({
+                id: friendDoc.id,
+                ...friendDoc.data()
+              } as UserData);
+            }
           }
+          friendsData.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
+          setFriends(friendsData);
+        } else {
+          setFriends([]);
         }
-        friendsData.sort((a, b) => a.username.toLowerCase().localeCompare(b.username.toLowerCase()));
-        setFriends(friendsData);
-      } else {
-        setFriends([]);
-      }
-      setIsOffline(false);
+        setConnectionStatus('connected');
+      }, 'loading friends');
     } catch (error: any) {
-      handleFirebaseError(error, 'loading friends');
+      const appError = ErrorHandler.handleFirebaseError(error, 'loading friends');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -263,35 +268,49 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     try {
-      setError('');
-      await enableNetwork(db);
+      setError(null);
       
-      const existingQuery = query(
-        collection(db, 'friendRequests'),
-        where('fromUserId', '==', user.uid),
-        where('toUserId', '==', toUserId),
-        where('status', '==', 'pending')
-      );
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        
+        const existingQuery = query(
+          collection(db, 'friendRequests'),
+          where('fromUserId', '==', user.uid),
+          where('toUserId', '==', toUserId),
+          where('status', '==', 'pending')
+        );
+        
+        const existingSnapshot = await getDocs(existingQuery);
+        if (!existingSnapshot.empty) {
+          throw new Error('Friend request already sent to this user.');
+        }
+        
+        await addDoc(collection(db, 'friendRequests'), {
+          fromUserId: user.uid,
+          fromUsername: user.displayName || 'Unknown',
+          toUserId,
+          toUsername,
+          status: 'pending',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }, 'sending friend request');
       
-      const existingSnapshot = await getDocs(existingQuery);
-      if (!existingSnapshot.empty) {
-        setError('Friend request already sent to this user.');
-        return;
-      }
-      
-      await addDoc(collection(db, 'friendRequests'), {
-        fromUserId: user.uid,
-        fromUsername: user.displayName || 'Unknown',
-        toUserId,
-        toUsername,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      
-      setIsOffline(false);
+      setConnectionStatus('connected');
     } catch (error: any) {
-      handleFirebaseError(error, 'sending friend request');
+      if (error.message?.includes('already sent')) {
+        setError({
+          code: 'duplicate-request',
+          message: error.message,
+          userMessage: error.message,
+          retryable: false,
+          severity: 'low'
+        });
+      } else {
+        const appError = ErrorHandler.handleFirebaseError(error, 'sending friend request');
+        setError(appError);
+        setConnectionStatus('disconnected');
+      }
     }
   };
 
@@ -299,29 +318,34 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     try {
-      setError('');
-      await enableNetwork(db);
+      setError(null);
       
-      await updateDoc(doc(db, 'friendRequests', requestId), {
-        status: response,
-        updatedAt: serverTimestamp()
-      });
-      
-      if (response === 'accepted') {
-        await updateDoc(doc(db, 'users', user.uid), {
-          friends: arrayUnion(request.fromUserId)
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        
+        await updateDoc(doc(db, 'friendRequests', requestId), {
+          status: response,
+          updatedAt: serverTimestamp()
         });
         
-        await updateDoc(doc(db, 'users', request.fromUserId), {
-          friends: arrayUnion(user.uid)
-        });
-        
-        await loadFriends();
-      }
+        if (response === 'accepted') {
+          await updateDoc(doc(db, 'users', user.uid), {
+            friends: arrayUnion(request.fromUserId)
+          });
+          
+          await updateDoc(doc(db, 'users', request.fromUserId), {
+            friends: arrayUnion(user.uid)
+          });
+          
+          await loadFriends();
+        }
+      }, `${response === 'accepted' ? 'accepting' : 'rejecting'} friend request`);
       
-      setIsOffline(false);
+      setConnectionStatus('connected');
     } catch (error: any) {
-      handleFirebaseError(error, 'responding to friend request');
+      const appError = ErrorHandler.handleFirebaseError(error, 'responding to friend request');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -329,21 +353,27 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     try {
-      setError('');
-      await enableNetwork(db);
+      setError(null);
       
-      await updateDoc(doc(db, 'users', user.uid), {
-        friends: arrayRemove(friendId)
-      });
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        
+        await updateDoc(doc(db, 'users', user.uid), {
+          friends: arrayRemove(friendId)
+        });
+        
+        await updateDoc(doc(db, 'users', friendId), {
+          friends: arrayRemove(user.uid)
+        });
+        
+        await loadFriends();
+      }, 'removing friend');
       
-      await updateDoc(doc(db, 'users', friendId), {
-        friends: arrayRemove(user.uid)
-      });
-      
-      await loadFriends();
-      setIsOffline(false);
+      setConnectionStatus('connected');
     } catch (error: any) {
-      handleFirebaseError(error, 'removing friend');
+      const appError = ErrorHandler.handleFirebaseError(error, 'removing friend');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -353,42 +383,55 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     setChallenging(prev => new Set(prev).add(toUserId));
 
     try {
-      setError('');
-      await enableNetwork(db);
+      setError(null);
       
-      // Check if challenge already exists
-      const existingQuery = query(
-        collection(db, 'challenges'),
-        where('fromUserId', '==', user.uid),
-        where('toUserId', '==', toUserId),
-        where('status', '==', 'pending')
-      );
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        
+        // Check if challenge already exists
+        const existingQuery = query(
+          collection(db, 'challenges'),
+          where('fromUserId', '==', user.uid),
+          where('toUserId', '==', toUserId),
+          where('status', '==', 'pending')
+        );
+        
+        const existingSnapshot = await getDocs(existingQuery);
+        if (!existingSnapshot.empty) {
+          throw new Error('Challenge already sent to this user.');
+        }
+        
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+        
+        await addDoc(collection(db, 'challenges'), {
+          fromUserId: user.uid,
+          fromUsername: user.displayName || 'Unknown',
+          toUserId,
+          toUsername,
+          status: 'pending',
+          gameType: 'multiplayer',
+          createdAt: serverTimestamp(),
+          expiresAt: expiresAt
+        });
+      }, 'sending challenge');
       
-      const existingSnapshot = await getDocs(existingQuery);
-      if (!existingSnapshot.empty) {
-        setError('Challenge already sent to this user.');
-        return;
-      }
-      
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 5);
-      
-      await addDoc(collection(db, 'challenges'), {
-        fromUserId: user.uid,
-        fromUsername: user.displayName || 'Unknown',
-        toUserId,
-        toUsername,
-        status: 'pending',
-        gameType: 'multiplayer',
-        createdAt: serverTimestamp(),
-        expiresAt: expiresAt
-      });
-      
-      setIsOffline(false);
-      setError('');
+      setConnectionStatus('connected');
       
     } catch (error: any) {
-      handleFirebaseError(error, 'sending challenge');
+      if (error.message?.includes('already sent')) {
+        setError({
+          code: 'duplicate-challenge',
+          message: error.message,
+          userMessage: error.message,
+          retryable: false,
+          severity: 'low'
+        });
+      } else {
+        const appError = ErrorHandler.handleFirebaseError(error, 'sending challenge');
+        setError(appError);
+        setConnectionStatus('disconnected');
+      }
     } finally {
       setChallenging(prev => {
         const newSet = new Set(prev);
@@ -402,58 +445,63 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     try {
-      setError('');
-      await enableNetwork(db);
+      setError(null);
       
-      await updateDoc(doc(db, 'challenges', challengeId), {
-        status: response,
-        updatedAt: serverTimestamp()
-      });
-      
-      if (response === 'accepted' && onStartOnlineGame) {
-        // Create a new game session
-        const gameState = initializeGame();
-        gameState.isOnlineGame = true;
-        gameState.hostId = challenge.fromUserId;
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
         
-        // Set up players with correct IDs and names
-        gameState.players[0] = {
-          id: challenge.fromUserId,
-          name: challenge.fromUsername,
-          hand: gameState.players[0].hand,
-          nikoKadiCalled: false,
-          isOnline: true
-        };
+        await updateDoc(doc(db, 'challenges', challengeId), {
+          status: response,
+          updatedAt: serverTimestamp()
+        });
         
-        gameState.players[1] = {
-          id: user.uid,
-          name: user.displayName || 'Player',
-          hand: gameState.players[1].hand,
-          nikoKadiCalled: false,
-          isOnline: true
-        };
+        if (response === 'accepted' && onStartOnlineGame) {
+          // Create a new game session
+          const gameState = initializeGame();
+          gameState.isOnlineGame = true;
+          gameState.hostId = challenge.fromUserId;
+          
+          // Set up players with correct IDs and names
+          gameState.players[0] = {
+            id: challenge.fromUserId,
+            name: challenge.fromUsername,
+            hand: gameState.players[0].hand,
+            nikoKadiCalled: false,
+            isOnline: true
+          };
+          
+          gameState.players[1] = {
+            id: user.uid,
+            name: user.displayName || 'Player',
+            hand: gameState.players[1].hand,
+            nikoKadiCalled: false,
+            isOnline: true
+          };
 
-        const gameSession: Partial<OnlineGameSession> = {
-          hostId: challenge.fromUserId,
-          hostName: challenge.fromUsername,
-          guestId: user.uid,
-          guestName: user.displayName || 'Player',
-          gameState: gameState,
-          status: 'active',
-          createdAt: new Date(),
-          lastMoveAt: new Date()
-        };
+          const gameSession: Partial<OnlineGameSession> = {
+            hostId: challenge.fromUserId,
+            hostName: challenge.fromUsername,
+            guestId: user.uid,
+            guestName: user.displayName || 'Player',
+            gameState: gameState,
+            status: 'active',
+            createdAt: new Date(),
+            lastMoveAt: new Date()
+          };
 
-        const gameSessionRef = await addDoc(collection(db, 'gameSessions'), gameSession);
-        
-        // Start the online game
-        onStartOnlineGame(gameSessionRef.id, challenge.fromUserId, challenge.fromUsername);
-        onClose();
-      }
+          const gameSessionRef = await addDoc(collection(db, 'gameSessions'), gameSession);
+          
+          // Start the online game
+          onStartOnlineGame(gameSessionRef.id, challenge.fromUserId, challenge.fromUsername);
+          onClose();
+        }
+      }, `${response === 'accepted' ? 'accepting' : 'rejecting'} challenge`);
       
-      setIsOffline(false);
+      setConnectionStatus('connected');
     } catch (error: any) {
-      handleFirebaseError(error, 'responding to challenge');
+      const appError = ErrorHandler.handleFirebaseError(error, 'responding to challenge');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -466,15 +514,19 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const handleRefresh = async () => {
-    setError('');
-    setIsOffline(false);
+    setError(null);
+    setConnectionStatus('connected');
     
     try {
-      await enableNetwork(db);
-      await loadAllUsers();
-      await loadFriends();
+      await ErrorHandler.withRetry(async () => {
+        await enableNetwork(db);
+        await loadAllUsers();
+        await loadFriends();
+      }, 'refreshing data');
     } catch (error: any) {
-      handleFirebaseError(error, 'refreshing data');
+      const appError = ErrorHandler.handleFirebaseError(error, 'refreshing data');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -482,20 +534,25 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     if (!user) return;
 
     try {
-      const challengesRef = collection(db, 'challenges');
-      const snapshot = await getDocs(challengesRef);
-      
-      const deletePromises: Promise<void>[] = [];
-      snapshot.forEach((challengeDoc) => {
-        deletePromises.push(deleteDoc(doc(db, 'challenges', challengeDoc.id)));
-      });
+      await ErrorHandler.withRetry(async () => {
+        const challengesRef = collection(db, 'challenges');
+        const snapshot = await getDocs(challengesRef);
+        
+        const deletePromises: Promise<void>[] = [];
+        snapshot.forEach((challengeDoc) => {
+          deletePromises.push(deleteDoc(doc(db, 'challenges', challengeDoc.id)));
+        });
 
-      await Promise.all(deletePromises);
-      setError('');
+        await Promise.all(deletePromises);
+      }, 'clearing all challenges');
       
-    } catch (error) {
-      console.error('Error clearing challenges:', error);
-      setError('Failed to clear challenges');
+      setError(null);
+      setConnectionStatus('connected');
+      
+    } catch (error: any) {
+      const appError = ErrorHandler.handleFirebaseError(error, 'clearing challenges');
+      setError(appError);
+      setConnectionStatus('disconnected');
     }
   };
 
@@ -515,12 +572,14 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
             <div>
               <h2 className="text-2xl font-bold mb-2">Friends & Online Challenges</h2>
               <p className="text-purple-100">Connect and play online with other Kadi players</p>
-              {isOffline && (
-                <div className="flex items-center space-x-2 mt-2 text-yellow-200">
-                  <WifiOff size={16} />
-                  <span className="text-sm">Connection issues detected</span>
-                </div>
-              )}
+              <div className="mt-2">
+                <ConnectionStatus 
+                  isConnected={connectionStatus === 'connected'}
+                  isReconnecting={connectionStatus === 'reconnecting'}
+                  lastError={error?.userMessage}
+                  onRetry={handleRefresh}
+                />
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <button
@@ -596,15 +655,21 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           </div>
 
           {/* Error Message */}
-          {error && (
-            <div className={`border rounded-lg px-4 py-3 text-sm mb-4 ${
-              isOffline 
-                ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                : 'bg-red-50 border-red-200 text-red-600'
-            }`}>
-              <div className="flex items-center space-x-2">
-                {isOffline ? <WifiOff size={16} /> : null}
-                <span>{error}</span>
+          {error && error.severity !== 'low' && (
+            <div className="border rounded-lg px-4 py-3 text-sm mb-4 bg-red-50 border-red-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle size={16} className="text-red-600" />
+                  <span className="text-red-800">{error.userMessage}</span>
+                </div>
+                {error.retryable && (
+                  <button
+                    onClick={handleRefresh}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition-colors"
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -620,7 +685,8 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                 
                 <button
                   onClick={clearAllChallenges}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  disabled={connectionStatus !== 'connected'}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   <Trash2 size={16} />
                   <span>Clear All Challenges</span>
@@ -634,7 +700,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                   <p>• Your Friends: {friends.length}</p>
                   <p>• Pending Friend Requests: {friendRequests.length}</p>
                   <p>• Pending Challenges: {challenges.length}</p>
-                  <p>• Connection Status: {isOffline ? 'Offline' : 'Online'}</p>
+                  <p>• Connection Status: {connectionStatus}</p>
                 </div>
               </div>
             </div>
@@ -665,7 +731,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                   <div className="flex items-center space-x-2">
                     <button 
                       onClick={() => sendChallenge(friend.id, friend.username)}
-                      disabled={isOffline || challengingUsers.has(friend.id)}
+                      disabled={connectionStatus !== 'connected' || challengingUsers.has(friend.id)}
                       className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Gamepad2 size={16} />
@@ -673,7 +739,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                     </button>
                     <button
                       onClick={() => removeFriend(friend.id)}
-                      disabled={isOffline}
+                      disabled={connectionStatus !== 'connected'}
                       className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <UserMinus size={16} />
@@ -681,7 +747,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                   </div>
                 </div>
               ))}
-              {friends.length === 0 && !isOffline && (
+              {friends.length === 0 && connectionStatus === 'connected' && (
                 <div className="text-center py-8 text-gray-500">
                   <Users size={48} className="mx-auto mb-4 text-gray-300" />
                   <p>No friends yet</p>
@@ -712,7 +778,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => respondToFriendRequest(request.id, 'accepted', request)}
-                            disabled={isOffline}
+                            disabled={connectionStatus !== 'connected'}
                             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                           >
                             <Check size={16} />
@@ -720,7 +786,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                           </button>
                           <button
                             onClick={() => respondToFriendRequest(request.id, 'rejected', request)}
-                            disabled={isOffline}
+                            disabled={connectionStatus !== 'connected'}
                             className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                           >
                             <X size={16} />
@@ -785,7 +851,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'accepted', challenge)}
-                      disabled={isOffline}
+                      disabled={connectionStatus !== 'connected'}
                       className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 animate-pulse"
                     >
                       <Check size={16} />
@@ -793,7 +859,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                     </button>
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'rejected', challenge)}
-                      disabled={isOffline}
+                      disabled={connectionStatus !== 'connected'}
                       className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                     >
                       <X size={16} />
@@ -860,7 +926,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                         {!isFriend(userData.id) && !hasPendingRequest(userData.id) && (
                           <button
                             onClick={() => sendFriendRequest(userData.id, userData.username)}
-                            disabled={isOffline}
+                            disabled={connectionStatus !== 'connected'}
                             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <UserPlus size={16} />
@@ -877,7 +943,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => sendChallenge(userData.id, userData.username)}
-                              disabled={isOffline || challengingUsers.has(userData.id)}
+                              disabled={connectionStatus !== 'connected' || challengingUsers.has(userData.id)}
                               className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                             >
                               <Gamepad2 size={14} />
