@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2 } from 'lucide-react';
+import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2, Crown, Zap } from 'lucide-react';
 import { 
   collection, 
   query, 
@@ -16,20 +16,25 @@ import {
   orderBy,
   onSnapshot,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
-import { UserData, FriendRequest, GameChallenge } from '../../types';
-import { ClearChallengesButton } from './ClearChallengesButton';
+import { UserData, FriendRequest, GameChallenge, OnlineGameSession } from '../../types';
+import { initializeGame } from '../../utils/gameLogic';
 
-interface FriendsModalProps {
+interface EnhancedFriendsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStartChallenge?: (opponentId: string, opponentName: string) => void;
+  onStartOnlineGame?: (gameSessionId: string, opponentId: string, opponentName: string) => void;
 }
 
-export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onStartChallenge }) => {
+export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onStartOnlineGame 
+}) => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
@@ -42,6 +47,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
   const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges' | 'admin'>('friends');
   const [error, setError] = useState('');
   const [isOffline, setIsOffline] = useState(false);
+  const [challengingUsers, setChallenging] = useState<Set<string>>(new Set());
 
   // Use refs to track active listeners and prevent multiple subscriptions
   const challengesUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -54,22 +60,19 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       loadFriends();
       setupRealtimeListeners();
     } else {
-      // Clean up listeners when modal is closed
       cleanupListeners();
     }
 
-    // Cleanup on unmount
     return () => {
       cleanupListeners();
     };
   }, [isOpen, user]);
 
   useEffect(() => {
-    // Filter users based on search query
     if (searchQuery.trim()) {
       const filtered = allUsers.filter(userData => 
         userData.username.toLowerCase().includes(searchQuery.toLowerCase().trim()) &&
-        userData.id !== user?.uid // Exclude current user
+        userData.id !== user?.uid
       );
       setFilteredUsers(filtered);
     } else {
@@ -95,7 +98,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
   const setupRealtimeListeners = () => {
     if (!user?.uid) return;
 
-    // Clean up any existing listeners first
     cleanupListeners();
 
     try {
@@ -145,7 +147,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         handleFirebaseError(error, 'loading friend requests');
       });
 
-      // Set up sent requests listener - Remove orderBy to avoid index requirement
+      // Set up sent requests listener
       const sentRequestsQuery = query(
         collection(db, 'friendRequests'),
         where('fromUserId', '==', user.uid),
@@ -157,7 +159,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         snapshot.forEach((doc) => {
           sent.push({ id: doc.id, ...doc.data() } as FriendRequest);
         });
-        // Sort in memory instead of using orderBy
         sent.sort((a, b) => {
           const aTime = a.createdAt?.toDate?.() || new Date(0);
           const bTime = b.createdAt?.toDate?.() || new Date(0);
@@ -265,7 +266,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       setError('');
       await enableNetwork(db);
       
-      // Check if request already exists
       const existingQuery = query(
         collection(db, 'friendRequests'),
         where('fromUserId', '==', user.uid),
@@ -279,7 +279,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
         return;
       }
       
-      // Create friend request
       await addDoc(collection(db, 'friendRequests'), {
         fromUserId: user.uid,
         fromUsername: user.displayName || 'Unknown',
@@ -303,14 +302,12 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       setError('');
       await enableNetwork(db);
       
-      // Update request status
       await updateDoc(doc(db, 'friendRequests', requestId), {
         status: response,
         updatedAt: serverTimestamp()
       });
       
       if (response === 'accepted') {
-        // Add each other as friends
         await updateDoc(doc(db, 'users', user.uid), {
           friends: arrayUnion(request.fromUserId)
         });
@@ -319,7 +316,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
           friends: arrayUnion(user.uid)
         });
         
-        // Reload friends list
         await loadFriends();
       }
       
@@ -336,7 +332,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       setError('');
       await enableNetwork(db);
       
-      // Remove from both users' friend lists
       await updateDoc(doc(db, 'users', user.uid), {
         friends: arrayRemove(friendId)
       });
@@ -353,7 +348,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
   };
 
   const sendChallenge = async (toUserId: string, toUsername: string) => {
-    if (!user) return;
+    if (!user || challengingUsers.has(toUserId)) return;
+
+    setChallenging(prev => new Set(prev).add(toUserId));
 
     try {
       setError('');
@@ -374,9 +371,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       }
       
       const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5 minute expiry
+      expiresAt.setMinutes(expiresAt.getMinutes() + 5);
       
-      // Create challenge
       await addDoc(collection(db, 'challenges'), {
         fromUserId: user.uid,
         fromUsername: user.displayName || 'Unknown',
@@ -393,6 +389,12 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       
     } catch (error: any) {
       handleFirebaseError(error, 'sending challenge');
+    } finally {
+      setChallenging(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(toUserId);
+        return newSet;
+      });
     }
   };
 
@@ -403,15 +405,49 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       setError('');
       await enableNetwork(db);
       
-      // Update challenge status
       await updateDoc(doc(db, 'challenges', challengeId), {
         status: response,
         updatedAt: serverTimestamp()
       });
       
-      if (response === 'accepted' && onStartChallenge) {
-        // Start the multiplayer game
-        onStartChallenge(challenge.fromUserId, challenge.fromUsername);
+      if (response === 'accepted' && onStartOnlineGame) {
+        // Create a new game session
+        const gameState = initializeGame();
+        gameState.isOnlineGame = true;
+        gameState.hostId = challenge.fromUserId;
+        
+        // Set up players with correct IDs and names
+        gameState.players[0] = {
+          id: challenge.fromUserId,
+          name: challenge.fromUsername,
+          hand: gameState.players[0].hand,
+          nikoKadiCalled: false,
+          isOnline: true
+        };
+        
+        gameState.players[1] = {
+          id: user.uid,
+          name: user.displayName || 'Player',
+          hand: gameState.players[1].hand,
+          nikoKadiCalled: false,
+          isOnline: true
+        };
+
+        const gameSession: Partial<OnlineGameSession> = {
+          hostId: challenge.fromUserId,
+          hostName: challenge.fromUsername,
+          guestId: user.uid,
+          guestName: user.displayName || 'Player',
+          gameState: gameState,
+          status: 'active',
+          createdAt: new Date(),
+          lastMoveAt: new Date()
+        };
+
+        const gameSessionRef = await addDoc(collection(db, 'gameSessions'), gameSession);
+        
+        // Start the online game
+        onStartOnlineGame(gameSessionRef.id, challenge.fromUserId, challenge.fromUsername);
         onClose();
       }
       
@@ -437,14 +473,30 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
       await enableNetwork(db);
       await loadAllUsers();
       await loadFriends();
-      // Real-time listeners will handle the rest
     } catch (error: any) {
       handleFirebaseError(error, 'refreshing data');
     }
   };
 
-  const handleClearComplete = () => {
-    setError('');
+  const clearAllChallenges = async () => {
+    if (!user) return;
+
+    try {
+      const challengesRef = collection(db, 'challenges');
+      const snapshot = await getDocs(challengesRef);
+      
+      const deletePromises: Promise<void>[] = [];
+      snapshot.forEach((challengeDoc) => {
+        deletePromises.push(deleteDoc(doc(db, 'challenges', challengeDoc.id)));
+      });
+
+      await Promise.all(deletePromises);
+      setError('');
+      
+    } catch (error) {
+      console.error('Error clearing challenges:', error);
+      setError('Failed to clear challenges');
+    }
   };
 
   if (!isOpen) return null;
@@ -461,8 +513,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
           </button>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Friends & Challenges</h2>
-              <p className="text-purple-100">Connect and play with other Kadi players</p>
+              <h2 className="text-2xl font-bold mb-2">Friends & Online Challenges</h2>
+              <p className="text-purple-100">Connect and play online with other Kadi players</p>
               {isOffline && (
                 <div className="flex items-center space-x-2 mt-2 text-yellow-200">
                   <WifiOff size={16} />
@@ -516,7 +568,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              <Gamepad2 size={16} className="inline mr-2" id="tab-challenges-icon" />
+              <Gamepad2 size={16} className="inline mr-2" />
               Challenges ({challenges.length})
             </button>
             <button
@@ -566,7 +618,13 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                   These actions will permanently delete data from the system. Use with caution.
                 </p>
                 
-                <ClearChallengesButton onClearComplete={handleClearComplete} />
+                <button
+                  onClick={clearAllChallenges}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  <span>Clear All Challenges</span>
+                </button>
               </div>
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -596,16 +654,22 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                       <p className="text-sm text-gray-600">
                         {friend.gamesWon || 0}/{friend.gamesPlayed || 0} games won
                       </p>
+                      {friend.isOnline && (
+                        <div className="flex items-center space-x-1 text-green-600">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs">Online</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button 
                       onClick={() => sendChallenge(friend.id, friend.username)}
-                      disabled={isOffline}
+                      disabled={isOffline || challengingUsers.has(friend.id)}
                       className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Gamepad2 size={16} id={`challenge-friend-${friend.id}`} />
-                      <span>Challenge</span>
+                      <Gamepad2 size={16} />
+                      <span>{challengingUsers.has(friend.id) ? 'Sending...' : 'Challenge'}</span>
                     </button>
                     <button
                       onClick={() => removeFriend(friend.id)}
@@ -708,11 +772,11 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                 <div key={challenge.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border-l-4 border-orange-500">
                   <div className="flex items-center space-x-3">
                     <div className="bg-orange-500 p-2 rounded-full animate-pulse">
-                      <Gamepad2 className="text-white" size={16} id={`challenge-list-${challenge.id}`} />
+                      <Gamepad2 className="text-white" size={16} />
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-800">{challenge.fromUsername}</h4>
-                      <p className="text-sm text-gray-600">challenged you to a game</p>
+                      <p className="text-sm text-gray-600">challenged you to an online game</p>
                       <p className="text-xs text-gray-500">
                         Expires: {challenge.expiresAt?.toLocaleTimeString()}
                       </p>
@@ -725,7 +789,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                       className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 animate-pulse"
                     >
                       <Check size={16} />
-                      <span>Accept & Play</span>
+                      <span>Accept & Play Online</span>
                     </button>
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'rejected', challenge)}
@@ -740,9 +804,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
               ))}
               {challenges.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <Gamepad2 size={48} className="mx-auto mb-4 text-gray-300" id="no-challenges-icon" />
+                  <Gamepad2 size={48} className="mx-auto mb-4 text-gray-300" />
                   <p>No pending challenges</p>
-                  <p className="text-sm mt-2">Challenge your friends to start playing!</p>
+                  <p className="text-sm mt-2">Challenge your friends to start playing online!</p>
                 </div>
               )}
             </div>
@@ -751,7 +815,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
           {/* Browse Users Tab */}
           {activeTab === 'browse' && (
             <div className="space-y-4">
-              {/* Search Bar */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -763,7 +826,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                 />
               </div>
 
-              {/* Loading State */}
               {loading && (
                 <div className="text-center py-8">
                   <RefreshCw className="animate-spin mx-auto mb-4 text-purple-500" size={32} />
@@ -771,7 +833,6 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                 </div>
               )}
 
-              {/* Users List */}
               {!loading && (
                 <div className="max-h-96 overflow-y-auto space-y-2">
                   {filteredUsers.map((userData) => (
@@ -781,34 +842,54 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, onS
                           <Users className="text-white" size={16} />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-800">{userData.username}</h4>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-semibold text-gray-800">{userData.username}</h4>
+                            {userData.isOnline && (
+                              <div className="flex items-center space-x-1">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-xs text-green-600">Online</span>
+                              </div>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">
                             {userData.gamesWon || 0}/{userData.gamesPlayed || 0} games won
                           </p>
                         </div>
                       </div>
-                      {!isFriend(userData.id) && !hasPendingRequest(userData.id) && (
-                        <button
-                          onClick={() => sendFriendRequest(userData.id, userData.username)}
-                          disabled={isOffline}
-                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <UserPlus size={16} />
-                          <span>Add Friend</span>
-                        </button>
-                      )}
-                      {hasPendingRequest(userData.id) && (
-                        <div className="flex items-center space-x-2 text-gray-600 font-medium">
-                          <Clock size={16} />
-                          <span>Request Sent</span>
-                        </div>
-                      )}
-                      {isFriend(userData.id) && (
-                        <div className="flex items-center space-x-2 text-green-600 font-medium">
-                          <MessageCircle size={16} />
-                          <span>Friends</span>
-                        </div>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {!isFriend(userData.id) && !hasPendingRequest(userData.id) && (
+                          <button
+                            onClick={() => sendFriendRequest(userData.id, userData.username)}
+                            disabled={isOffline}
+                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <UserPlus size={16} />
+                            <span>Add Friend</span>
+                          </button>
+                        )}
+                        {hasPendingRequest(userData.id) && (
+                          <div className="flex items-center space-x-2 text-gray-600 font-medium">
+                            <Clock size={16} />
+                            <span>Request Sent</span>
+                          </div>
+                        )}
+                        {isFriend(userData.id) && (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => sendChallenge(userData.id, userData.username)}
+                              disabled={isOffline || challengingUsers.has(userData.id)}
+                              className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                            >
+                              <Gamepad2 size={14} />
+                              <span className="text-sm">{challengingUsers.has(userData.id) ? 'Sending...' : 'Challenge'}</span>
+                            </button>
+                            <div className="flex items-center space-x-2 text-green-600 font-medium">
+                              <MessageCircle size={16} />
+                              <span>Friends</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                   

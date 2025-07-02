@@ -4,15 +4,20 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthModal } from '../auth/AuthModal';
-import { FriendsModal } from './FriendsModal';
+import { EnhancedFriendsModal } from './EnhancedFriendsModal';
 import { ChallengeNotification } from './ChallengeNotification';
 
 interface MainMenuProps {
   onStartSinglePlayer: () => void;
   onStartMultiplayer: () => void;
+  onStartOnlineGame?: (gameSessionId: string, opponentId: string, opponentName: string) => void;
 }
 
-export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStartMultiplayer }) => {
+export const MainMenu: React.FC<MainMenuProps> = ({ 
+  onStartSinglePlayer, 
+  onStartMultiplayer, 
+  onStartOnlineGame 
+}) => {
   const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
@@ -26,8 +31,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
   };
 
   const handleStartChallenge = (opponentId: string, opponentName: string) => {
-    // For now, just start multiplayer mode
-    // In the future, this could be enhanced to track the specific opponent
+    // For local multiplayer, just start the regular multiplayer mode
     onStartMultiplayer();
   };
 
@@ -80,9 +84,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
                     <Users size={20} className="sm:w-6 sm:h-6" />
                   </div>
                   <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold">Play with Friends</h3>
+                    <h3 className="text-lg sm:text-xl font-semibold">Local Multiplayer</h3>
                     <p className="text-blue-100 text-sm">
-                      {user ? 'Local multiplayer mode' : 'Sign in for multiplayer features'}
+                      {user ? 'Pass & play on same device' : 'Sign in for multiplayer features'}
                     </p>
                   </div>
                 </div>
@@ -92,7 +96,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
               </div>
             </button>
 
-            {/* Friends & Challenges Button - Only show when signed in */}
+            {/* Online Friends & Challenges Button - Only show when signed in */}
             {user && (
               <button
                 onClick={() => setShowFriendsModal(true)}
@@ -104,8 +108,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
                       <Gamepad2 size={20} className="sm:w-6 sm:h-6" />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-lg sm:text-xl font-semibold">Friends & Challenges</h3>
-                      <p className="text-purple-100 text-sm">Connect with other players</p>
+                      <h3 className="text-lg sm:text-xl font-semibold">Online Multiplayer</h3>
+                      <p className="text-purple-100 text-sm">Challenge friends to online games</p>
                     </div>
                   </div>
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xl sm:text-2xl">
@@ -164,7 +168,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
                 <User className="text-white mx-auto mb-4" size={40} />
                 <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Join the Community</h3>
                 <p className="text-emerald-200 mb-4 sm:mb-6 text-sm sm:text-base">
-                  Sign in to save your progress and access multiplayer features.
+                  Sign in to save your progress and play online with friends.
                 </p>
                 <button
                   onClick={() => setShowAuthModal(true)}
@@ -180,7 +184,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
         {/* Footer */}
         <div className="text-center mt-8 sm:mt-12 text-emerald-300">
           <p className="text-sm">
-            Experience the authentic Kenyan card game with modern features
+            Experience the authentic Kenyan card game with modern online features
           </p>
         </div>
       </div>
@@ -190,10 +194,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onStartSinglePlayer, onStart
       
       {user && (
         <>
-          <FriendsModal 
+          <EnhancedFriendsModal 
             isOpen={showFriendsModal} 
             onClose={() => setShowFriendsModal(false)}
-            onStartChallenge={handleStartChallenge}
+            onStartOnlineGame={onStartOnlineGame}
           />
           <ChallengeNotification onStartChallenge={handleStartChallenge} />
         </>

@@ -15,6 +15,7 @@ export interface Player {
   name: string;
   hand: Card[];
   nikoKadiCalled: boolean;
+  isOnline?: boolean;
 }
 
 export interface GameState {
@@ -29,6 +30,10 @@ export interface GameState {
   winner: string | null;
   turnHistory: string[];
   aiDifficulty?: AIDifficulty;
+  gameId?: string;
+  isOnlineGame?: boolean;
+  hostId?: string;
+  lastMoveTimestamp?: Date;
 }
 
 export interface PlayCardOptions {
@@ -45,6 +50,8 @@ export interface UserData {
   gamesPlayed: number;
   gamesWon: number;
   friends?: string[];
+  isOnline?: boolean;
+  lastSeen?: Date;
 }
 
 export interface FriendRequest {
@@ -69,4 +76,29 @@ export interface GameChallenge {
   createdAt: Date;
   expiresAt: Date;
   updatedAt?: any; // Firestore timestamp
+}
+
+export interface OnlineGameSession {
+  id: string;
+  hostId: string;
+  hostName: string;
+  guestId: string;
+  guestName: string;
+  gameState: GameState;
+  status: 'waiting' | 'active' | 'completed' | 'abandoned';
+  createdAt: Date;
+  lastMoveAt: Date;
+  winner?: string;
+}
+
+export interface GameMove {
+  id: string;
+  gameId: string;
+  playerId: string;
+  playerName: string;
+  moveType: 'playCards' | 'drawCard' | 'declareNikoKadi' | 'selectSuit' | 'drawPenalty';
+  cardIds?: string[];
+  selectedSuit?: Suit;
+  timestamp: Date;
+  gameStateAfter: GameState;
 }
