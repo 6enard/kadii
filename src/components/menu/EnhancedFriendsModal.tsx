@@ -142,11 +142,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const setupRealtimeListeners = () => {
     if (!user?.uid || !challengesQuery || !incomingRequestsQuery || !sentRequestsQuery || !mountedRef.current) return;
 
-    // If any listeners are already active, clean them up first to ensure a clean slate
-    if (challengesUnsubscribeRef.current || friendRequestsUnsubscribeRef.current || sentRequestsUnsubscribeRef.current) {
-      cleanupListeners();
-    }
-
     try {
       setConnectionStatus('connected');
       setError(null);
