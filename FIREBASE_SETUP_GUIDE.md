@@ -76,7 +76,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Users can read and write their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Users can read, update, and delete their own user document
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow a user to create their own user document upon signup
+      allow create: if request.auth != null && request.auth.uid == userId;
       
       // Allow users to read other users' public info for future features
       allow read: if request.auth != null;
@@ -149,7 +153,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
       // Users can only read/write their own document
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow a user to create their own user document upon signup
+      allow create: if request.auth != null && request.auth.uid == userId;
       
       // Allow reading public user info for friends features (limited fields)
       allow read: if request.auth != null && 
