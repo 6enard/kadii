@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, UserMinus, Check, Clock, Gamepad2, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, UserMinus, Check, Clock, Gamepad2, Trophy, Star, Crown, Zap } from 'lucide-react';
 import { 
   collection, 
   query, 
@@ -12,7 +12,6 @@ import {
   enableNetwork,
   addDoc,
   where,
-  orderBy,
   onSnapshot,
   deleteDoc,
   serverTimestamp,
@@ -25,13 +24,13 @@ import { initializeGame } from '../../utils/gameLogic';
 import { ErrorHandler, AppError } from '../../utils/errorHandling';
 import { ConnectionStatus } from '../common/ConnectionStatus';
 
-interface EnhancedFriendsModalProps {
+interface FriendsAndGameModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStartOnlineGame?: (gameSessionId: string, opponentId: string, opponentName: string) => void;
 }
 
-export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({ 
+export const FriendsAndGameModal: React.FC<FriendsAndGameModalProps> = ({ 
   isOpen, 
   onClose, 
   onStartOnlineGame 
@@ -45,11 +44,10 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [challenges, setChallenges] = useState<GameChallenge[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'browse' | 'friends' | 'requests' | 'challenges' | 'admin'>('admin');
+  const [activeTab, setActiveTab] = useState<'friends' | 'browse' | 'requests' | 'challenges'>('friends');
   const [error, setError] = useState<AppError | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
   const [challengingUsers, setChallenging] = useState<Set<string>>(new Set());
-  const [clearingData, setClearingData] = useState(false);
 
   // Use refs to track active listeners and prevent multiple subscriptions
   const challengesUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -89,7 +87,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     mountedRef.current = true;
     
     if (isOpen && user) {
-      console.log("Setting up friends modal listeners");
       loadAllUsers();
       loadFriends();
       setupRealtimeListeners();
@@ -97,13 +94,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       cleanupListeners();
     }
 
-    // Always return cleanup function
     return () => {
       cleanupListeners();
     };
   }, [isOpen, user]);
 
-  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       mountedRef.current = false;
@@ -124,7 +119,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   }, [searchQuery, allUsers, user]);
 
   const cleanupListeners = () => {
-    console.log("Cleaning up friends modal listeners");
     if (challengesUnsubscribeRef.current) {
       challengesUnsubscribeRef.current();
       challengesUnsubscribeRef.current = null;
@@ -168,7 +162,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         const appError = ErrorHandler.handleFirebaseError(error, 'loading challenges');
         setError(appError);
         setConnectionStatus('disconnected');
-        // Cleanup this specific listener on error
         if (challengesUnsubscribeRef.current) {
           challengesUnsubscribeRef.current();
           challengesUnsubscribeRef.current = null;
@@ -191,7 +184,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         const appError = ErrorHandler.handleFirebaseError(error, 'loading friend requests');
         setError(appError);
         setConnectionStatus('disconnected');
-        // Cleanup this specific listener on error
         if (friendRequestsUnsubscribeRef.current) {
           friendRequestsUnsubscribeRef.current();
           friendRequestsUnsubscribeRef.current = null;
@@ -219,7 +211,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         const appError = ErrorHandler.handleFirebaseError(error, 'loading sent requests');
         setError(appError);
         setConnectionStatus('disconnected');
-        // Cleanup this specific listener on error
         if (sentRequestsUnsubscribeRef.current) {
           sentRequestsUnsubscribeRef.current();
           sentRequestsUnsubscribeRef.current = null;
@@ -465,7 +456,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       await ErrorHandler.withRetry(async () => {
         await enableNetwork(db);
         
-        // Check if challenge already exists
         const existingQuery = query(
           collection(db, 'challenges'),
           where('fromUserId', '==', user.uid),
@@ -539,12 +529,10 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           });
           
           if (response === 'accepted' && onStartOnlineGame) {
-            // Create a new game session
             const gameState = initializeGame();
             gameState.isOnlineGame = true;
             gameState.hostId = challenge.fromUserId;
             
-            // Set up players with correct IDs and names
             gameState.players[0] = {
               id: challenge.fromUserId,
               name: challenge.fromUsername,
@@ -575,13 +563,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
             const gameSessionRef = doc(collection(db, 'gameSessions'));
             transaction.set(gameSessionRef, gameSession);
             
-            // Store the game session ID for later use
             (window as any).pendingGameSessionId = gameSessionRef.id;
           }
         });
         
         if (response === 'accepted' && onStartOnlineGame) {
-          // Start the online game with the created session
           const gameSessionId = (window as any).pendingGameSessionId;
           if (gameSessionId) {
             onStartOnlineGame(gameSessionId, challenge.fromUserId, challenge.fromUsername);
@@ -627,103 +613,12 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     }
   };
 
-  const clearAllData = async () => {
-    if (!user || !mountedRef.current) return;
-
-    setClearingData(true);
-    setError(null);
-
-    try {
-      await ErrorHandler.withRetry(async () => {
-        // Clear all challenges
-        const challengesRef = collection(db, 'challenges');
-        const challengesSnapshot = await getDocs(challengesRef);
-        
-        const challengeDeletePromises: Promise<void>[] = [];
-        challengesSnapshot.forEach((challengeDoc) => {
-          challengeDeletePromises.push(deleteDoc(doc(db, 'challenges', challengeDoc.id)));
-        });
-
-        // Clear all friend requests
-        const friendRequestsRef = collection(db, 'friendRequests');
-        const friendRequestsSnapshot = await getDocs(friendRequestsRef);
-        
-        const requestDeletePromises: Promise<void>[] = [];
-        friendRequestsSnapshot.forEach((requestDoc) => {
-          requestDeletePromises.push(deleteDoc(doc(db, 'friendRequests', requestDoc.id)));
-        });
-
-        // Clear all game sessions
-        const gameSessionsRef = collection(db, 'gameSessions');
-        const gameSessionsSnapshot = await getDocs(gameSessionsRef);
-        
-        const sessionDeletePromises: Promise<void>[] = [];
-        gameSessionsSnapshot.forEach((sessionDoc) => {
-          sessionDeletePromises.push(deleteDoc(doc(db, 'gameSessions', sessionDoc.id)));
-        });
-
-        // Clear all game moves
-        const gameMovesRef = collection(db, 'gameMoves');
-        const gameMovesSnapshot = await getDocs(gameMovesRef);
-        
-        const moveDeletePromises: Promise<void>[] = [];
-        gameMovesSnapshot.forEach((moveDoc) => {
-          moveDeletePromises.push(deleteDoc(doc(db, 'gameMoves', moveDoc.id)));
-        });
-
-        // Clear friends from all users
-        const usersRef = collection(db, 'users');
-        const usersSnapshot = await getDocs(usersRef);
-        
-        const userUpdatePromises: Promise<void>[] = [];
-        usersSnapshot.forEach((userDoc) => {
-          userUpdatePromises.push(updateDoc(doc(db, 'users', userDoc.id), {
-            friends: []
-          }));
-        });
-
-        // Execute all deletions and updates
-        await Promise.all([
-          ...challengeDeletePromises,
-          ...requestDeletePromises,
-          ...sessionDeletePromises,
-          ...moveDeletePromises,
-          ...userUpdatePromises
-        ]);
-
-        // Reset local state
-        if (mountedRef.current) {
-          setChallenges([]);
-          setFriendRequests([]);
-          setSentRequests([]);
-          setFriends([]);
-        }
-        
-        console.log('Successfully cleared all data');
-      }, 'clearing all data');
-      
-      if (mountedRef.current) {
-        setConnectionStatus('connected');
-      }
-      
-    } catch (error: any) {
-      if (!mountedRef.current) return;
-      const appError = ErrorHandler.handleFirebaseError(error, 'clearing all data');
-      setError(appError);
-      setConnectionStatus('disconnected');
-    } finally {
-      if (mountedRef.current) {
-        setClearingData(false);
-      }
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-6 text-white relative">
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden border border-purple-500/30">
+        <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 p-6 text-white relative">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
@@ -732,8 +627,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
           </button>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Friends & Online Challenges</h2>
-              <p className="text-purple-100">Connect and play online with other Kadi players</p>
+              <h2 className="text-2xl font-bold mb-2 flex items-center space-x-2">
+                <Users size={24} />
+                <span>Friends & Online Games</span>
+              </h2>
+              <p className="text-purple-100">Connect and challenge your friends to epic Kadi battles</p>
               <div className="mt-2">
                 <ConnectionStatus 
                   isConnected={connectionStatus === 'connected'}
@@ -758,72 +656,58 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
         <div className="p-6">
           {/* Tabs */}
-          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 mb-6">
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                activeTab === 'admin'
-                  ? 'bg-white text-red-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Trash2 size={16} className="inline mr-2" />
-              Admin
-            </button>
+          <div className="flex space-x-1 bg-slate-800 rounded-lg p-1 mb-6">
             <button
               onClick={() => setActiveTab('friends')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center space-x-2 ${
                 activeTab === 'friends'
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-gray-300 hover:text-white'
               }`}
             >
-              <Users size={16} className="inline mr-2" />
-              Friends ({friends.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('requests')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                activeTab === 'requests'
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Clock size={16} className="inline mr-2" />
-              Requests ({friendRequests.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('challenges')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                activeTab === 'challenges'
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Gamepad2 size={16} className="inline mr-2" />
-              Challenges ({challenges.length})
+              <Users size={16} />
+              <span>Friends ({friends.length})</span>
             </button>
             <button
               onClick={() => setActiveTab('browse')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center space-x-2 ${
                 activeTab === 'browse'
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-gray-300 hover:text-white'
               }`}
             >
-              <Search size={16} className="inline mr-2" />
-              Browse ({filteredUsers.length})
+              <Search size={16} />
+              <span>Find Players ({filteredUsers.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center space-x-2 ${
+                activeTab === 'requests'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              <Clock size={16} />
+              <span>Requests ({friendRequests.length + sentRequests.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('challenges')}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center space-x-2 ${
+                activeTab === 'challenges'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              <Gamepad2 size={16} />
+              <span>Challenges ({challenges.length})</span>
             </button>
           </div>
 
           {/* Error Message */}
           {error && error.severity !== 'low' && (
-            <div className="border rounded-lg px-4 py-3 text-sm mb-4 bg-red-50 border-red-200">
+            <div className="border rounded-lg px-4 py-3 text-sm mb-4 bg-red-500/20 border-red-500/50">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle size={16} className="text-red-600" />
-                  <span className="text-red-800">{error.userMessage}</span>
-                </div>
+                <span className="text-red-200">{error.userMessage}</span>
                 {error.retryable && (
                   <button
                     onClick={handleRefresh}
@@ -836,68 +720,29 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
             </div>
           )}
 
-          {/* Admin Tab */}
-          {activeTab === 'admin' && (
-            <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="font-semibold text-red-800 mb-2">⚠️ CLEAR ALL DATA</h4>
-                <p className="text-sm text-red-700 mb-4">
-                  This will permanently delete ALL data from the system:
-                </p>
-                <ul className="text-sm text-red-700 mb-4 space-y-1 list-disc list-inside">
-                  <li>All friend requests (sent and received)</li>
-                  <li>All game challenges</li>
-                  <li>All friend connections</li>
-                  <li>All game sessions</li>
-                  <li>All game moves history</li>
-                </ul>
-                
-                <button
-                  onClick={clearAllData}
-                  disabled={connectionStatus !== 'connected' || clearingData}
-                  className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-bold"
-                >
-                  <Trash2 size={16} />
-                  <span>{clearingData ? 'Clearing All Data...' : 'CLEAR ALL DATA NOW'}</span>
-                  {clearingData && <RefreshCw size={16} className="animate-spin" />}
-                </button>
-                
-                {clearingData && (
-                  <div className="mt-3 text-sm text-red-600">
-                    Please wait while we clear all data from the system...
-                  </div>
-                )}
-              </div>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">ℹ️ System Information</h4>
-                <div className="text-sm text-blue-700 space-y-1">
-                  <p>• Total Users: {allUsers.length}</p>
-                  <p>• Your Friends: {friends.length}</p>
-                  <p>• Pending Friend Requests: {friendRequests.length}</p>
-                  <p>• Pending Challenges: {challenges.length}</p>
-                  <p>• Connection Status: {connectionStatus}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Friends Tab */}
           {activeTab === 'friends' && (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {friends.map((friend) => (
-                <div key={friend.id} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                <div key={friend.id} className="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors border border-slate-700/50">
                   <div className="flex items-center space-x-3">
                     <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-2 rounded-full">
-                      <Users className="text-white" size={16} />
+                      <Crown className="text-white" size={16} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-800">{friend.username}</h4>
-                      <p className="text-sm text-gray-600">
-                        {friend.gamesWon || 0}/{friend.gamesPlayed || 0} games won
-                      </p>
+                      <h4 className="font-semibold text-white">{friend.username}</h4>
+                      <div className="flex items-center space-x-3 text-sm">
+                        <div className="flex items-center space-x-1 text-yellow-400">
+                          <Trophy size={12} />
+                          <span>{friend.gamesWon || 0} wins</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-blue-400">
+                          <Gamepad2 size={12} />
+                          <span>{friend.gamesPlayed || 0} games</span>
+                        </div>
+                      </div>
                       {friend.isOnline && (
-                        <div className="flex items-center space-x-1 text-green-600">
+                        <div className="flex items-center space-x-1 text-green-400 mt-1">
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                           <span className="text-xs">Online</span>
                         </div>
@@ -908,7 +753,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                     <button 
                       onClick={() => sendChallenge(friend.id, friend.username)}
                       disabled={connectionStatus !== 'connected' || challengingUsers.has(friend.id)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Gamepad2 size={16} />
                       <span>{challengingUsers.has(friend.id) ? 'Sending...' : 'Challenge'}</span>
@@ -916,7 +761,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                     <button
                       onClick={() => removeFriend(friend.id)}
                       disabled={connectionStatus !== 'connected'}
-                      className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <UserMinus size={16} />
                     </button>
@@ -924,10 +769,110 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                 </div>
               ))}
               {friends.length === 0 && connectionStatus === 'connected' && (
-                <div className="text-center py-8 text-gray-500">
-                  <Users size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p>No friends yet</p>
-                  <p className="text-sm mt-2">Browse users to send friend requests!</p>
+                <div className="text-center py-12 text-gray-400">
+                  <Users size={48} className="mx-auto mb-4 text-gray-600" />
+                  <p className="text-lg mb-2">No friends yet</p>
+                  <p className="text-sm">Find players and send friend requests to start playing together!</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Browse Users Tab */}
+          {activeTab === 'browse' && (
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search players by username..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-400"
+                />
+              </div>
+
+              {loading && (
+                <div className="text-center py-8">
+                  <RefreshCw className="animate-spin mx-auto mb-4 text-purple-500" size={32} />
+                  <p className="text-gray-400">Loading players...</p>
+                </div>
+              )}
+
+              {!loading && (
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {filteredUsers.map((userData) => (
+                    <div key={userData.id} className="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors border border-slate-700/50">
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-full">
+                          <Star className="text-white" size={16} />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-semibold text-white">{userData.username}</h4>
+                            {userData.isOnline && (
+                              <div className="flex items-center space-x-1">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-xs text-green-400">Online</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-3 text-sm">
+                            <div className="flex items-center space-x-1 text-yellow-400">
+                              <Trophy size={12} />
+                              <span>{userData.gamesWon || 0} wins</span>
+                            </div>
+                            <div className="flex items-center space-x-1 text-blue-400">
+                              <Gamepad2 size={12} />
+                              <span>{userData.gamesPlayed || 0} games</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {!isFriend(userData.id) && !hasPendingRequest(userData.id) && (
+                          <button
+                            onClick={() => sendFriendRequest(userData.id, userData.username)}
+                            disabled={connectionStatus !== 'connected'}
+                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <UserPlus size={16} />
+                            <span>Add Friend</span>
+                          </button>
+                        )}
+                        {hasPendingRequest(userData.id) && (
+                          <div className="flex items-center space-x-2 text-gray-400 font-medium">
+                            <Clock size={16} />
+                            <span>Request Sent</span>
+                          </div>
+                        )}
+                        {isFriend(userData.id) && (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => sendChallenge(userData.id, userData.username)}
+                              disabled={connectionStatus !== 'connected' || challengingUsers.has(userData.id)}
+                              className="flex items-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Gamepad2 size={14} />
+                              <span className="text-sm">{challengingUsers.has(userData.id) ? 'Sending...' : 'Challenge'}</span>
+                            </button>
+                            <div className="flex items-center space-x-2 text-green-400 font-medium">
+                              <MessageCircle size={16} />
+                              <span>Friends</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {filteredUsers.length === 0 && searchQuery && (
+                    <div className="text-center py-8 text-gray-400">
+                      <Search size={48} className="mx-auto mb-4 text-gray-600" />
+                      <p>No players found matching "{searchQuery}"</p>
+                      <p className="text-sm mt-2">Try a different search term</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -938,24 +883,24 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
             <div className="space-y-4">
               {friendRequests.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-gray-800 mb-3">Incoming Requests</h4>
+                  <h4 className="font-semibold text-white mb-3">Incoming Requests</h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {friendRequests.map((request) => (
-                      <div key={request.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                      <div key={request.id} className="flex items-center justify-between p-4 bg-blue-500/20 rounded-lg border border-blue-500/30">
                         <div className="flex items-center space-x-3">
                           <div className="bg-blue-500 p-2 rounded-full">
                             <UserPlus className="text-white" size={16} />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-800">{request.fromUsername}</h4>
-                            <p className="text-sm text-gray-600">wants to be your friend</p>
+                            <h4 className="font-semibold text-white">{request.fromUsername}</h4>
+                            <p className="text-sm text-blue-200">wants to be your friend</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => respondToFriendRequest(request.id, 'accepted', request)}
                             disabled={connectionStatus !== 'connected'}
-                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
                           >
                             <Check size={16} />
                             <span>Accept</span>
@@ -963,7 +908,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                           <button
                             onClick={() => respondToFriendRequest(request.id, 'rejected', request)}
                             disabled={connectionStatus !== 'connected'}
-                            className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
                           >
                             <X size={16} />
                             <span>Decline</span>
@@ -977,17 +922,17 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
               {sentRequests.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-gray-800 mb-3">Sent Requests</h4>
+                  <h4 className="font-semibold text-white mb-3">Sent Requests</h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {sentRequests.map((request) => (
-                      <div key={request.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div key={request.id} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
                         <div className="flex items-center space-x-3">
                           <div className="bg-gray-500 p-2 rounded-full">
                             <Clock className="text-white" size={16} />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-800">{request.toUsername}</h4>
-                            <p className="text-sm text-gray-600">Friend request pending</p>
+                            <h4 className="font-semibold text-white">{request.toUsername}</h4>
+                            <p className="text-sm text-gray-400">Friend request pending</p>
                           </div>
                         </div>
                         <span className="text-sm text-gray-500">Waiting for response...</span>
@@ -998,10 +943,10 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
               )}
 
               {friendRequests.length === 0 && sentRequests.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Clock size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p>No pending friend requests</p>
-                  <p className="text-sm mt-2">Send requests to other players to connect!</p>
+                <div className="text-center py-12 text-gray-400">
+                  <Clock size={48} className="mx-auto mb-4 text-gray-600" />
+                  <p className="text-lg mb-2">No pending friend requests</p>
+                  <p className="text-sm">Send requests to other players to connect!</p>
                 </div>
               )}
             </div>
@@ -1009,17 +954,17 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
 
           {/* Challenges Tab */}
           {activeTab === 'challenges' && (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {challenges.map((challenge) => (
-                <div key={challenge.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border-l-4 border-orange-500">
+                <div key={challenge.id} className="flex items-center justify-between p-4 bg-orange-500/20 rounded-lg border border-orange-500/30">
                   <div className="flex items-center space-x-3">
                     <div className="bg-orange-500 p-2 rounded-full animate-pulse">
                       <Gamepad2 className="text-white" size={16} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-800">{challenge.fromUsername}</h4>
-                      <p className="text-sm text-gray-600">challenged you to an online game</p>
-                      <p className="text-xs text-gray-500">
+                      <h4 className="font-semibold text-white">{challenge.fromUsername}</h4>
+                      <p className="text-sm text-orange-200">challenged you to an online game</p>
+                      <p className="text-xs text-orange-300">
                         Expires: {challenge.expiresAt?.toLocaleTimeString()}
                       </p>
                     </div>
@@ -1028,15 +973,15 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'accepted', challenge)}
                       disabled={connectionStatus !== 'connected'}
-                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 animate-pulse"
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 animate-pulse"
                     >
                       <Check size={16} />
-                      <span>Accept & Play Online</span>
+                      <span>Accept & Play</span>
                     </button>
                     <button
                       onClick={() => respondToChallenge(challenge.id, 'rejected', challenge)}
                       disabled={connectionStatus !== 'connected'}
-                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
                       <X size={16} />
                       <span>Decline</span>
@@ -1045,103 +990,10 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
                 </div>
               ))}
               {challenges.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Gamepad2 size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p>No pending challenges</p>
-                  <p className="text-sm mt-2">Challenge your friends to start playing online!</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Browse Users Tab */}
-          {activeTab === 'browse' && (
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Search users by username..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              {loading && (
-                <div className="text-center py-8">
-                  <RefreshCw className="animate-spin mx-auto mb-4 text-purple-500" size={32} />
-                  <p className="text-gray-600">Loading users...</p>
-                </div>
-              )}
-
-              {!loading && (
-                <div className="max-h-96 overflow-y-auto space-y-2">
-                  {filteredUsers.map((userData) => (
-                    <div key={userData.id} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-full">
-                          <Users className="text-white" size={16} />
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-semibold text-gray-800">{userData.username}</h4>
-                            {userData.isOnline && (
-                              <div className="flex items-center space-x-1">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-xs text-green-600">Online</span>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            {userData.gamesWon || 0}/{userData.gamesPlayed || 0} games won
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {!isFriend(userData.id) && !hasPendingRequest(userData.id) && (
-                          <button
-                            onClick={() => sendFriendRequest(userData.id, userData.username)}
-                            disabled={connectionStatus !== 'connected'}
-                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <UserPlus size={16} />
-                            <span>Add Friend</span>
-                          </button>
-                        )}
-                        {hasPendingRequest(userData.id) && (
-                          <div className="flex items-center space-x-2 text-gray-600 font-medium">
-                            <Clock size={16} />
-                            <span>Request Sent</span>
-                          </div>
-                        )}
-                        {isFriend(userData.id) && (
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => sendChallenge(userData.id, userData.username)}
-                              disabled={connectionStatus !== 'connected' || challengingUsers.has(userData.id)}
-                              className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                            >
-                              <Gamepad2 size={14} />
-                              <span className="text-sm">{challengingUsers.has(userData.id) ? 'Sending...' : 'Challenge'}</span>
-                            </button>
-                            <div className="flex items-center space-x-2 text-green-600 font-medium">
-                              <MessageCircle size={16} />
-                              <span>Friends</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {filteredUsers.length === 0 && searchQuery && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Search size={48} className="mx-auto mb-4 text-gray-300" />
-                      <p>No users found matching "{searchQuery}"</p>
-                      <p className="text-sm mt-2">Try a different search term</p>
-                    </div>
-                  )}
+                <div className="text-center py-12 text-gray-400">
+                  <Gamepad2 size={48} className="mx-auto mb-4 text-gray-600" />
+                  <p className="text-lg mb-2">No pending challenges</p>
+                  <p className="text-sm">Challenge your friends to start playing online!</p>
                 </div>
               )}
             </div>

@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import { Play, Users, Trophy, Settings, LogOut, User, Gamepad2 } from 'lucide-react';
+import { Play, Trophy, Settings, LogOut, User, Users } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthModal } from '../auth/AuthModal';
-import { EnhancedFriendsModal } from './EnhancedFriendsModal';
+import { FriendsAndGameModal } from './FriendsAndGameModal';
 import { ChallengeNotification } from './ChallengeNotification';
 
 interface MainMenuProps {
   onStartSinglePlayer: () => void;
-  onStartMultiplayer: () => void;
   onStartOnlineGame?: (gameSessionId: string, opponentId: string, opponentName: string) => void;
 }
 
 export const MainMenu: React.FC<MainMenuProps> = ({ 
   onStartSinglePlayer, 
-  onStartMultiplayer, 
   onStartOnlineGame 
 }) => {
   const { user } = useAuth();
@@ -31,7 +29,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   };
 
   const handleStartChallenge = (gameSessionId: string, opponentId: string, opponentName: string) => {
-    // Start the online game with the provided session details
     if (onStartOnlineGame) {
       onStartOnlineGame(gameSessionId, opponentId, opponentName);
     }
@@ -67,7 +64,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                   </div>
                   <div className="text-left">
                     <h3 className="text-lg sm:text-xl font-semibold">Play vs Computer</h3>
-                    <p className="text-emerald-100 text-sm">Practice against AI</p>
+                    <p className="text-emerald-100 text-sm">Practice against AI opponents</p>
                   </div>
                 </div>
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xl sm:text-2xl">
@@ -76,30 +73,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               </div>
             </button>
 
-            <button
-              onClick={user ? onStartMultiplayer : () => setShowAuthModal(true)}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white p-4 sm:p-6 rounded-xl shadow-lg transition-all duration-300 transform active:scale-95 sm:hover:scale-105 group touch-manipulation"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3 sm:space-x-4">
-                  <div className="bg-white bg-opacity-20 p-2 sm:p-3 rounded-lg">
-                    <Users size={20} className="sm:w-6 sm:h-6" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold">Local Multiplayer</h3>
-                    <p className="text-blue-100 text-sm">
-                      {user ? 'Pass & play on same device' : 'Sign in for multiplayer features'}
-                    </p>
-                  </div>
-                </div>
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xl sm:text-2xl">
-                  →
-                </div>
-              </div>
-            </button>
-
-            {/* Online Friends & Challenges Button - Only show when signed in */}
-            {user && (
+            {/* Online Multiplayer with Friends - Only show when signed in */}
+            {user ? (
               <button
                 onClick={() => setShowFriendsModal(true)}
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white p-4 sm:p-6 rounded-xl shadow-lg transition-all duration-300 transform active:scale-95 sm:hover:scale-105 group touch-manipulation"
@@ -107,11 +82,31 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 sm:space-x-4">
                     <div className="bg-white bg-opacity-20 p-2 sm:p-3 rounded-lg">
-                      <Gamepad2 size={20} className="sm:w-6 sm:h-6" />
+                      <Users size={20} className="sm:w-6 sm:h-6" />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-lg sm:text-xl font-semibold">Online Multiplayer</h3>
+                      <h3 className="text-lg sm:text-xl font-semibold">Play with Friends</h3>
                       <p className="text-purple-100 text-sm">Challenge friends to online games</p>
+                    </div>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xl sm:text-2xl">
+                    →
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white p-4 sm:p-6 rounded-xl shadow-lg transition-all duration-300 transform active:scale-95 sm:hover:scale-105 group touch-manipulation"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="bg-white bg-opacity-20 p-2 sm:p-3 rounded-lg">
+                      <Users size={20} className="sm:w-6 sm:h-6" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg sm:text-xl font-semibold">Play with Friends</h3>
+                      <p className="text-blue-100 text-sm">Sign in to play online with friends</p>
                     </div>
                   </div>
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xl sm:text-2xl">
@@ -196,7 +191,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       
       {user && (
         <>
-          <EnhancedFriendsModal 
+          <FriendsAndGameModal 
             isOpen={showFriendsModal} 
             onClose={() => setShowFriendsModal(false)}
             onStartOnlineGame={onStartOnlineGame}

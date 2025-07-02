@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { MainMenu } from './components/menu/MainMenu';
 import { SinglePlayerGame } from './components/game/SinglePlayerGame';
-import { MultiplayerGame } from './components/game/MultiplayerGame';
 import { OnlineMultiplayerGame } from './components/game/OnlineMultiplayerGame';
 import { ErrorFallback } from './components/common/ErrorBoundary';
 import { createErrorBoundary } from './utils/errorHandling';
 
-type GameMode = 'menu' | 'singlePlayer' | 'multiplayer' | 'onlineMultiplayer';
+type GameMode = 'menu' | 'singlePlayer' | 'onlineMultiplayer';
 
 interface OnlineGameData {
   gameSessionId: string;
@@ -23,10 +22,6 @@ function App() {
 
   const handleStartSinglePlayer = () => {
     setGameMode('singlePlayer');
-  };
-
-  const handleStartMultiplayer = () => {
-    setGameMode('multiplayer');
   };
 
   const handleStartOnlineGame = (gameSessionId: string, opponentId: string, opponentName: string) => {
@@ -45,15 +40,11 @@ function App() {
         {gameMode === 'menu' && (
           <MainMenu
             onStartSinglePlayer={handleStartSinglePlayer}
-            onStartMultiplayer={handleStartMultiplayer}
             onStartOnlineGame={handleStartOnlineGame}
           />
         )}
         {gameMode === 'singlePlayer' && (
           <SinglePlayerGame onBackToMenu={handleBackToMenu} />
-        )}
-        {gameMode === 'multiplayer' && (
-          <MultiplayerGame onBackToMenu={handleBackToMenu} />
         )}
         {gameMode === 'onlineMultiplayer' && onlineGameData && (
           <OnlineMultiplayerGame 
