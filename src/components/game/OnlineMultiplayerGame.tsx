@@ -17,9 +17,11 @@ import { SuitSelector } from '../SuitSelector';
 import { GameStatus } from '../GameStatus';
 import { ConnectionStatus } from '../common/ConnectionStatus';
 import { GameErrorFallback } from '../common/ErrorBoundary';
+import { AudioControls } from '../menu/AudioControls';
 import { ErrorHandler, AppError } from '../../utils/errorHandling';
-import { ArrowLeft, Volume2, VolumeX, Users, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Users, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAudio } from '../../contexts/AudioContext';
 import { 
   doc, 
   onSnapshot, 
@@ -46,9 +48,9 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
   opponentName 
 }) => {
   const { user } = useAuth();
+  const { playSound } = useAudio();
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'reconnecting'>('connecting');
   const [opponentOnline, setOpponentOnline] = useState(true);
   const [gameSession, setGameSession] = useState<OnlineGameSession | null>(null);
@@ -90,10 +92,17 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       // Find which player index corresponds to the current user
       const myPlayerIndex = gameState.players.findIndex(p => p.id === user.uid);
       if (myPlayerIndex !== -1) {
-        setIsMyTurn(gameState.currentPlayerIndex === myPlayerIndex);
+        const wasMyTurn = isMyTurn;
+        const nowMyTurn = gameState.currentPlayerIndex === myPlayerIndex;
+        setIsMyTurn(nowMyTurn);
+        
+        // Play turn change sound when it becomes my turn
+        if (!wasMyTurn && nowMyTurn) {
+          playSound('turnChange');
+        }
       }
     }
-  }, [gameState, user]);
+  }, [gameState, user, isMyTurn, playSound]);
 
   const cleanupListeners = () => {
     if (gameUnsubscribeRef.current) {
@@ -286,10 +295,32 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
 
       setSelectedCards([]);
       
+      // Play appropriate sound
+      switch (moveType) {
+        case 'playCards':
+          if (data.cardIds?.length > 1) {
+            playSound('special');
+          } else {
+            playSound('cardPlay');
+          }
+          break;
+        case 'drawCard':
+        case 'drawPenalty':
+          playSound('cardDraw');
+          break;
+        case 'declareNikoKadi':
+          playSound('nikoKadi');
+          break;
+        case 'selectSuit':
+          playSound('special');
+          break;
+      }
+      
     } catch (error: any) {
       if (!mountedRef.current) return;
       
       console.error('Error making move:', error);
+      playSound('error');
       if (error instanceof Error && error.message.includes('Invalid move')) {
         setError({
           code: 'invalid-move',
@@ -312,6 +343,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
   const handleCardClick = useCallback((cardId: string) => {
     if (!isMyTurn || gameState?.gamePhase !== 'playing' || isLoading) return;
     
+    playSound('buttonClick');
     setSelectedCards(prev => {
       if (prev.includes(cardId)) {
         return prev.filter(id => id !== cardId);
@@ -323,7 +355,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
         }
       }
     });
-  }, [isMyTurn, gameState?.gamePhase, isLoading]);
+  }, [isMyTurn, gameState?.gamePhase, isLoading, playSound]);
 
   const handlePlayCards = useCallback(() => {
     if (selectedCards.length === 0 || !isMyTurn || isLoading) return;
@@ -400,11 +432,13 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       }, 'starting new game');
 
       setSelectedCards([]);
+      playSound('cardShuffle');
       
     } catch (error: any) {
       if (!mountedRef.current) return;
       
       console.error('Error starting new game:', error);
+      playSound('error');
       const appError = ErrorHandler.handleFirebaseError(error, 'starting new game');
       setError(appError);
     } finally {
@@ -412,7 +446,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
         setIsLoading(false);
       }
     }
-  }, [user, gameSession, gameSessionId, isLoading]);
+  }, [user, gameSession, gameSessionId, isLoading, playSound]);
 
   const handleDrawPenalty = useCallback(() => {
     if (!isMyTurn || isLoading) return;
@@ -421,6 +455,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
 
   const handleLeaveGame = useCallback(async () => {
     try {
+      playSound('buttonClick');
       if (gameSession && user) {
         await ErrorHandler.withRetry(async () => {
           await updateDoc(doc(db, 'gameSessions', gameSessionId), {
@@ -434,19 +469,31 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
       // Don't show error for leaving game, just go back
     }
     onBackToMenu();
-  }, [gameSession, user, gameSessionId, onBackToMenu]);
+  }, [gameSession, user, gameSessionId, onBackToMenu, playSound]);
 
   const handleRetryConnection = useCallback(() => {
     setError(null);
     setConnectionStatus('connecting');
+    playSound('buttonClick');
     setupGameListeners();
-  }, []);
+  }, [playSound]);
 
   const handleGameErrorRetry = useCallback(() => {
     setGameError(null);
     setError(null);
     handleRetryConnection();
   }, [handleRetryConnection]);
+
+  // Play game over sounds
+  useEffect(() => {
+    if (gameState?.gamePhase === 'gameOver') {
+      if (gameState.winner === user?.displayName || gameState.winner === 'Player 1') {
+        playSound('gameWin');
+      } else {
+        playSound('gameLose');
+      }
+    }
+  }, [gameState?.gamePhase, gameState?.winner, user?.displayName, playSound]);
 
   // Show game error boundary if there's a critical game error
   if (gameError) {
@@ -548,12 +595,7 @@ export const OnlineMultiplayerGame: React.FC<OnlineMultiplayerGameProps> = ({
             </div>
             
             <div className="flex items-center space-x-2 self-end sm:self-auto">
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white transition-all shadow-lg touch-manipulation"
-              >
-                {soundEnabled ? <Volume2 size={14} className="sm:w-4 sm:h-4" /> : <VolumeX size={14} className="sm:w-4 sm:h-4" />}
-              </button>
+              <AudioControls />
               
               {gameSession?.hostId === user?.uid && (
                 <button

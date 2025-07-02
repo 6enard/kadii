@@ -7,3 +7,40 @@
 * {
   font-family: 'Happy Monkey', cursive;
 }
+
+/* Custom slider styles for audio controls */
+.slider {
+  background: linear-gradient(to right, #6366f1 0%, #6366f1 var(--value, 50%), #374151 var(--value, 50%), #374151 100%);
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Smooth transitions for all interactive elements */
+button, .slider {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Enhance focus states for accessibility */
+button:focus-visible, .slider:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}

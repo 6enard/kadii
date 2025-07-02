@@ -16,13 +16,16 @@ import { GameBoard } from '../GameBoard';
 import { GameControls } from '../GameControls';
 import { SuitSelector } from '../SuitSelector';
 import { GameStatus } from '../GameStatus';
-import { ArrowLeft, Settings, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { AudioControls } from '../menu/AudioControls';
+import { ArrowLeft, Settings, Sparkles } from 'lucide-react';
+import { useAudio } from '../../contexts/AudioContext';
 
 interface SinglePlayerGameProps {
   onBackToMenu: () => void;
 }
 
 export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu }) => {
+  const { playSound } = useAudio();
   const [gameState, setGameState] = useState<GameState>(() => {
     const game = initializeGame();
     game.players[1].name = 'Computer';
@@ -31,7 +34,6 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
   });
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   
   const currentPlayer = getCurrentPlayer(gameState);
   const isComputerTurn = gameState.currentPlayerIndex === 1;
@@ -40,17 +42,33 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
   useEffect(() => {
     if (isComputerTurn && gameState.gamePhase === 'playing') {
       const timer = setTimeout(() => {
+        playSound('turnChange');
         const newState = makeAIMove(gameState, gameState.aiDifficulty || 'medium');
         setGameState(newState);
+        
+        // Play appropriate sound based on AI action
+        if (newState.turnHistory.length > gameState.turnHistory.length) {
+          const lastAction = newState.turnHistory[newState.turnHistory.length - 1];
+          if (lastAction.includes('penalty')) {
+            playSound('penalty');
+          } else if (lastAction.includes('Ace')) {
+            playSound('special');
+          } else if (lastAction.includes('drew')) {
+            playSound('cardDraw');
+          } else {
+            playSound('cardPlay');
+          }
+        }
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [isComputerTurn, gameState]);
+  }, [isComputerTurn, gameState, playSound]);
   
   const handleCardClick = useCallback((cardId: string) => {
     if (gameState.gamePhase !== 'playing' || isComputerTurn) return;
     
+    playSound('buttonClick');
     setSelectedCards(prev => {
       if (prev.includes(cardId)) {
         return prev.filter(id => id !== cardId);
@@ -62,7 +80,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
         }
       }
     });
-  }, [gameState.gamePhase, isComputerTurn]);
+  }, [gameState.gamePhase, isComputerTurn, playSound]);
   
   const handlePlayCards = useCallback(() => {
     if (selectedCards.length === 0 || isComputerTurn) return;
@@ -70,7 +88,14 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     const newGameState = playCards(gameState, { cardIds: selectedCards });
     setGameState(newGameState);
     setSelectedCards([]);
-  }, [gameState, selectedCards, isComputerTurn]);
+    
+    // Play appropriate sound
+    if (selectedCards.length > 1) {
+      playSound('special');
+    } else {
+      playSound('cardPlay');
+    }
+  }, [gameState, selectedCards, isComputerTurn, playSound]);
   
   const handleDrawCard = useCallback(() => {
     if (isComputerTurn) return;
@@ -78,22 +103,26 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     if (gameState.drawStack > 0) {
       const newGameState = handlePenaltyDraw(gameState);
       setGameState(newGameState);
+      playSound('penalty');
     } else {
       const newGameState = drawCard(gameState, gameState.currentPlayerIndex);
       setGameState(newGameState);
+      playSound('cardDraw');
     }
-  }, [gameState, isComputerTurn]);
+  }, [gameState, isComputerTurn, playSound]);
   
   const handleDeclareNikoKadi = useCallback(() => {
     if (isComputerTurn) return;
     const newGameState = declareNikoKadi(gameState);
     setGameState(newGameState);
-  }, [gameState, isComputerTurn]);
+    playSound('nikoKadi');
+  }, [gameState, isComputerTurn, playSound]);
   
   const handleSelectSuit = useCallback((suit: Suit) => {
     const newGameState = selectSuit(gameState, suit);
     setGameState(newGameState);
-  }, [gameState]);
+    playSound('special');
+  }, [gameState, playSound]);
   
   const handleNewGame = useCallback(() => {
     const game = initializeGame();
@@ -101,24 +130,43 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
     game.aiDifficulty = gameState.aiDifficulty || 'medium';
     setGameState(game);
     setSelectedCards([]);
-  }, [gameState.aiDifficulty]);
+    playSound('cardShuffle');
+  }, [gameState.aiDifficulty, playSound]);
   
   const handleDrawPenalty = useCallback(() => {
     if (isComputerTurn) return;
     const newGameState = handlePenaltyDraw(gameState);
     setGameState(newGameState);
-  }, [gameState, isComputerTurn]);
+    playSound('penalty');
+  }, [gameState, isComputerTurn, playSound]);
   
   const handleDifficultyChange = useCallback((difficulty: AIDifficulty) => {
     setGameState(prev => ({ ...prev, aiDifficulty: difficulty }));
     setShowDifficultyModal(false);
-  }, []);
+    playSound('success');
+  }, [playSound]);
+
+  const handleBackToMenu = () => {
+    playSound('buttonClick');
+    onBackToMenu();
+  };
   
   const canPlaySelected = canPlayerPlay(gameState, selectedCards);
   
   const playableCards = !isComputerTurn ? currentPlayer.hand
     .filter(card => canPlayerPlay(gameState, [card.id]))
     .map(card => card.id) : [];
+
+  // Play game over sounds
+  useEffect(() => {
+    if (gameState.gamePhase === 'gameOver') {
+      if (gameState.winner === 'Player 1') {
+        playSound('gameWin');
+      } else {
+        playSound('gameLose');
+      }
+    }
+  }, [gameState.gamePhase, gameState.winner, playSound]);
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 relative overflow-hidden">
@@ -134,7 +182,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
           {/* Casino-style Header */}
           <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 bg-black/40 backdrop-blur-md rounded-xl sm:rounded-2xl border border-yellow-500/30 p-3 sm:p-4 shadow-2xl">
             <button
-              onClick={onBackToMenu}
+              onClick={handleBackToMenu}
               className="flex items-center space-x-2 text-yellow-400 hover:text-yellow-300 transition-colors font-medium self-start"
             >
               <ArrowLeft size={16} className="sm:w-5 sm:h-5" />
@@ -151,15 +199,13 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
             </div>
             
             <div className="flex items-center space-x-2 self-end sm:self-auto">
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white transition-all shadow-lg touch-manipulation"
-              >
-                {soundEnabled ? <Volume2 size={14} className="sm:w-4 sm:h-4" /> : <VolumeX size={14} className="sm:w-4 sm:h-4" />}
-              </button>
+              <AudioControls />
               
               <button
-                onClick={() => setShowDifficultyModal(true)}
+                onClick={() => {
+                  setShowDifficultyModal(true);
+                  playSound('buttonClick');
+                }}
                 className="flex items-center space-x-1 sm:space-x-2 px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white transition-all text-xs sm:text-sm font-medium shadow-lg touch-manipulation"
               >
                 <Settings size={12} className="sm:w-4 sm:h-4" />
@@ -296,7 +342,10 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
             
             <div className="p-3 sm:p-4 border-t border-white/10 bg-black/40">
               <button
-                onClick={() => setShowDifficultyModal(false)}
+                onClick={() => {
+                  setShowDifficultyModal(false);
+                  playSound('buttonClick');
+                }}
                 className="w-full px-4 py-2 sm:py-3 bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-lg sm:rounded-xl transition-all font-medium text-sm sm:text-base touch-manipulation"
               >
                 Apply Settings

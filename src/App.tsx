@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
+import { AudioProvider } from './contexts/AudioContext';
 import { MainMenu } from './components/menu/MainMenu';
 import { SinglePlayerGame } from './components/game/SinglePlayerGame';
 import { OnlineMultiplayerGame } from './components/game/OnlineMultiplayerGame';
@@ -36,25 +37,27 @@ function App() {
 
   return (
     <AppErrorBoundary>
-      <AuthProvider>
-        {gameMode === 'menu' && (
-          <MainMenu
-            onStartSinglePlayer={handleStartSinglePlayer}
-            onStartOnlineGame={handleStartOnlineGame}
-          />
-        )}
-        {gameMode === 'singlePlayer' && (
-          <SinglePlayerGame onBackToMenu={handleBackToMenu} />
-        )}
-        {gameMode === 'onlineMultiplayer' && onlineGameData && (
-          <OnlineMultiplayerGame 
-            onBackToMenu={handleBackToMenu}
-            gameSessionId={onlineGameData.gameSessionId}
-            opponentId={onlineGameData.opponentId}
-            opponentName={onlineGameData.opponentName}
-          />
-        )}
-      </AuthProvider>
+      <AudioProvider>
+        <AuthProvider>
+          {gameMode === 'menu' && (
+            <MainMenu
+              onStartSinglePlayer={handleStartSinglePlayer}
+              onStartOnlineGame={handleStartOnlineGame}
+            />
+          )}
+          {gameMode === 'singlePlayer' && (
+            <SinglePlayerGame onBackToMenu={handleBackToMenu} />
+          )}
+          {gameMode === 'onlineMultiplayer' && onlineGameData && (
+            <OnlineMultiplayerGame 
+              onBackToMenu={handleBackToMenu}
+              gameSessionId={onlineGameData.gameSessionId}
+              opponentId={onlineGameData.opponentId}
+              opponentName={onlineGameData.opponentName}
+            />
+          )}
+        </AuthProvider>
+      </AudioProvider>
     </AppErrorBoundary>
   );
 }
