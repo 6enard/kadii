@@ -4,13 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC5wi6x-V1LfZW90Ch5KH5pVnSyaLdNOFw",
-  authDomain: "kadii-171f7.firebaseapp.com",
-  projectId: "kadii-171f7",
-  storageBucket: "kadii-171f7.firebasestorage.app",
-  messagingSenderId: "261075441082",
-  appId: "1:261075441082:web:9960496d0815757dfef983",
-  measurementId: "G-M29H6YL64F"
+  apiKey: "AIzaSyC07LW_uyp0z_K5tS5_nFmxexowhGIr0i0",
+  authDomain: "kadiii.firebaseapp.com",
+  projectId: "kadiii",
+  storageBucket: "kadiii.firebasestorage.app",
+  messagingSenderId: "153138419349",
+  appId: "1:153138419349:web:cf12cb1b1ad0a9c7372d9c",
+  measurementId: "G-SM06HCRX49"
 };
 
 const app = initializeApp(firebaseConfig);

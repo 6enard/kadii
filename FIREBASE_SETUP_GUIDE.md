@@ -4,7 +4,7 @@
 
 ### 1.1 Enable Authentication
 1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Select your project: **kadii-171f7**
+2. Select your project: **kadiii**
 3. Click **Authentication** in the left sidebar
 4. Click **Get started** if not already enabled
 5. Go to **Sign-in method** tab
@@ -82,7 +82,35 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
     
-    // Future collections can be added here as needed
+    // Friend requests - users can read/write their own requests
+    match /friendRequests/{requestId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+    }
+    
+    // Game challenges - users can read/write their own challenges
+    match /challenges/{challengeId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+    }
+    
+    // Game sessions - players can read/write their own game sessions
+    match /gameSessions/{sessionId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.hostId || 
+         request.auth.uid == resource.data.guestId);
+      allow create: if request.auth != null;
+    }
+    
+    // Game moves - players can read/write moves for their games
+    match /gameMoves/{moveId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.playerId;
+    }
     
     // Deny all other access
     match /{document=**} {
@@ -123,9 +151,38 @@ service cloud.firestore {
       // Users can only read/write their own document
       allow read, write: if request.auth != null && request.auth.uid == userId;
       
-      // Allow reading public user info for future features (limited fields)
+      // Allow reading public user info for friends features (limited fields)
       allow read: if request.auth != null && 
         resource.data.keys().hasAll(['username', 'gamesPlayed', 'gamesWon']);
+    }
+    
+    match /friendRequests/{requestId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.fromUserId &&
+        request.resource.data.keys().hasAll(['fromUserId', 'toUserId', 'status', 'createdAt']);
+    }
+    
+    match /challenges/{challengeId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.fromUserId || 
+         request.auth.uid == resource.data.toUserId);
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.fromUserId;
+    }
+    
+    match /gameSessions/{sessionId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.hostId || 
+         request.auth.uid == resource.data.guestId);
+    }
+    
+    match /gameMoves/{moveId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.playerId;
     }
   }
 }
@@ -134,9 +191,12 @@ service cloud.firestore {
 ### 4.2 Indexes (if needed)
 If you experience slow queries, create these indexes:
 1. Go to **Indexes** tab in Firestore
-2. Create composite index for:
-   - Collection: `users`
-   - Fields: `username` (Ascending)
+2. Create composite indexes for:
+   - Collection: `friendRequests`
+   - Fields: `toUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
+   - Fields: `fromUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
+   - Collection: `challenges`
+   - Fields: `toUserId` (Ascending), `status` (Ascending), `createdAt` (Descending)
 
 ### 4.3 Backup Strategy
 1. Go to **Backups** tab
@@ -144,17 +204,17 @@ If you experience slow queries, create these indexes:
 
 ## Step 5: Environment Variables
 
-Your current Firebase config in `src/firebase/config.ts` is correct:
+Your current Firebase config in `src/firebase/config.ts` is now updated with the new project:
 
 ```typescript
 const firebaseConfig = {
-  apiKey: "AIzaSyC5wi6x-V1LfZW90Ch5KH5pVnSyaLdNOFw",
-  authDomain: "kadii-171f7.firebaseapp.com",
-  projectId: "kadii-171f7",
-  storageBucket: "kadii-171f7.firebasestorage.app",
-  messagingSenderId: "261075441082",
-  appId: "1:261075441082:web:9960496d0815757dfef983",
-  measurementId: "G-M29H6YL64F"
+  apiKey: "AIzaSyC07LW_uyp0z_K5tS5_nFmxexowhGIr0i0",
+  authDomain: "kadiii.firebaseapp.com",
+  projectId: "kadiii",
+  storageBucket: "kadiii.firebasestorage.app",
+  messagingSenderId: "153138419349",
+  appId: "1:153138419349:web:cf12cb1b1ad0a9c7372d9c",
+  measurementId: "G-SM06HCRX49"
 };
 ```
 
@@ -197,6 +257,8 @@ Once this setup is complete, your app will:
 - ✅ Allow users to register and sign in
 - ✅ Automatically create user profiles in Firestore
 - ✅ Secure user data with proper access controls
-- ✅ Support future multiplayer features when ready
+- ✅ Support online multiplayer features
+- ✅ Handle friend requests and game challenges
+- ✅ Enable real-time online gaming
 
-The app now focuses on the core card game experience with a clean foundation for future social features!
+The app now uses the new Firebase project **kadiii** with enhanced security and full online multiplayer capabilities!
