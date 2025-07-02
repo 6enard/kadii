@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Search, UserPlus, Users, MessageCircle, RefreshCw, Wifi, WifiOff, UserMinus, Check, Clock, Gamepad2, Trash2, AlertTriangle } from 'lucide-react';
 import { 
   collection, 
@@ -57,6 +57,36 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const friendRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
   const sentRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
 
+  // Memoize queries to prevent duplicate listeners
+  const challengesQuery = useMemo(() => {
+    if (!user?.uid) return null;
+    return query(
+      collection(db, 'challenges'),
+      where('toUserId', '==', user.uid),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+  }, [user?.uid]);
+
+  const incomingRequestsQuery = useMemo(() => {
+    if (!user?.uid) return null;
+    return query(
+      collection(db, 'friendRequests'),
+      where('toUserId', '==', user.uid),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+  }, [user?.uid]);
+
+  const sentRequestsQuery = useMemo(() => {
+    if (!user?.uid) return null;
+    return query(
+      collection(db, 'friendRequests'),
+      where('fromUserId', '==', user.uid),
+      where('status', '==', 'pending')
+    );
+  }, [user?.uid]);
+
   useEffect(() => {
     if (isOpen && user) {
       loadAllUsers();
@@ -69,7 +99,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     return () => {
       cleanupListeners();
     };
-  }, [isOpen, user]);
+  }, [isOpen, user, challengesQuery, incomingRequestsQuery, sentRequestsQuery]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -99,7 +129,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   };
 
   const setupRealtimeListeners = () => {
-    if (!user?.uid) return;
+    if (!user?.uid || !challengesQuery || !incomingRequestsQuery || !sentRequestsQuery) return;
 
     cleanupListeners();
 
@@ -108,13 +138,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       setError(null);
 
       // Set up challenges listener
-      const challengesQuery = query(
-        collection(db, 'challenges'),
-        where('toUserId', '==', user.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-      );
-
       challengesUnsubscribeRef.current = onSnapshot(challengesQuery, (snapshot) => {
         const incoming: GameChallenge[] = [];
         snapshot.forEach((doc) => {
@@ -136,13 +159,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       });
 
       // Set up friend requests listener
-      const incomingRequestsQuery = query(
-        collection(db, 'friendRequests'),
-        where('toUserId', '==', user.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-      );
-
       friendRequestsUnsubscribeRef.current = onSnapshot(incomingRequestsQuery, (snapshot) => {
         const incoming: FriendRequest[] = [];
         snapshot.forEach((doc) => {
@@ -158,12 +174,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       });
 
       // Set up sent requests listener
-      const sentRequestsQuery = query(
-        collection(db, 'friendRequests'),
-        where('fromUserId', '==', user.uid),
-        where('status', '==', 'pending')
-      );
-
       sentRequestsUnsubscribeRef.current = onSnapshot(sentRequestsQuery, (snapshot) => {
         const sent: FriendRequest[] = [];
         snapshot.forEach((doc) => {

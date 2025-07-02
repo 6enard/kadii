@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Gamepad2, Clock } from 'lucide-react';
 import { 
   collection, 
@@ -25,8 +25,18 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
   // Use ref to track the listener and prevent multiple subscriptions
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
+  // Memoize the query to prevent duplicate listeners
+  const challengesQuery = useMemo(() => {
+    if (!user?.uid) return null;
+    return query(
+      collection(db, 'challenges'),
+      where('fromUserId', '==', user.uid),
+      where('status', '==', 'accepted')
+    );
+  }, [user?.uid]);
+
   useEffect(() => {
-    if (!user?.uid) {
+    if (!user?.uid || !challengesQuery) {
       setAcceptedChallenges([]);
       setShowNotification(false);
       // Clean up any existing listener
@@ -44,13 +54,6 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
     }
 
     try {
-      // Create the query
-      const challengesQuery = query(
-        collection(db, 'challenges'),
-        where('fromUserId', '==', user.uid),
-        where('status', '==', 'accepted')
-      );
-
       // Set up the listener with proper error handling
       unsubscribeRef.current = onSnapshot(challengesQuery, (snapshot) => {
         const accepted: GameChallenge[] = [];
@@ -93,7 +96,7 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
         unsubscribeRef.current = null;
       }
     };
-  }, [user?.uid]);
+  }, [user?.uid, challengesQuery]);
 
   const handleStartGame = async (challenge: GameChallenge) => {
     try {
