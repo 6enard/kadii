@@ -187,7 +187,10 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       // Ace is countering penalty - don't change suit, just counter
       newState.drawStack = 0;
       newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace(s)`);
+      // When countering, the suit remains the same as the card before the penalty
+      // Don't ask for suit selection
     } else if (gameState.pendingQuestion) {
+      // Ace is answering a question - don't ask for suit selection
       // This case is already handled above
     } else {
       // Regular Ace play - ask for suit selection
@@ -238,7 +241,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   
   // Reset selected suit if not wild card (unless countering)
   if (!hasWild || (hasWild && (gameState.drawStack > 0 || gameState.pendingQuestion))) {
-    // Don't reset suit when Ace is used for countering
+    // Don't reset suit when Ace is used for countering or answering questions
     if (!(hasWild && (gameState.drawStack > 0 || gameState.pendingQuestion))) {
       newState.selectedSuit = null;
     }
@@ -258,7 +261,9 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       newState.turnHistory.push(`${currentPlayer.name} wins the game!`);
       return newState;
     } else if (!currentPlayer.nikoKadiCalled) {
+      // Player forgot to declare Niko Kadi - they become cardless but don't win
       newState.turnHistory.push(`${currentPlayer.name} finished cards but forgot to declare Niko Kadi - no win!`);
+      // Don't give them a card automatically - they stay cardless until their next turn
     } else {
       // Invalid win with special cards
       drawCard(newState, newState.currentPlayerIndex);

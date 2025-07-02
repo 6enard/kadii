@@ -40,7 +40,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
       if (prev.includes(cardId)) {
         return prev.filter(id => id !== cardId);
       } else {
-        if (prev.length < 2) {
+        if (prev.length < 6) {
           return [...prev, cardId];
         } else {
           return [cardId];

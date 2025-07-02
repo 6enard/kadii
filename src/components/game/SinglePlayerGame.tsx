@@ -55,7 +55,7 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
       if (prev.includes(cardId)) {
         return prev.filter(id => id !== cardId);
       } else {
-        if (prev.length < 2) {
+        if (prev.length < 6) {
           return [...prev, cardId];
         } else {
           return [cardId];
