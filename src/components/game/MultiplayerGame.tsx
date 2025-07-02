@@ -101,43 +101,43 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl animate-spin" style={{ animationDuration: '25s' }}></div>
+        <div className="absolute top-1/4 left-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] sm:w-[800px] sm:h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl animate-spin" style={{ animationDuration: '25s' }}></div>
       </div>
       
-      <div className="relative z-10 p-4 sm:p-6">
+      <div className="relative z-10 p-2 sm:p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
           {/* Casino-style Header */}
-          <div className="flex flex-col sm:flex-row items-center justify-between mb-6 bg-black/40 backdrop-blur-md rounded-2xl border border-purple-500/30 p-4 shadow-2xl">
+          <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 bg-black/40 backdrop-blur-md rounded-xl sm:rounded-2xl border border-purple-500/30 p-3 sm:p-4 shadow-2xl">
             <button
               onClick={onBackToMenu}
-              className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors font-medium mb-4 sm:mb-0"
+              className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors font-medium self-start"
             >
-              <ArrowLeft size={20} />
-              <span>Back to Lobby</span>
+              <ArrowLeft size={16} className="sm:w-5 sm:h-5" />
+              <span className="text-sm sm:text-base">Back to Lobby</span>
             </button>
             
-            <div className="text-center mb-4 sm:mb-0">
-              <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-500 to-purple-600 flex items-center justify-center space-x-2">
-                <Users size={24} className="text-purple-400" />
+            <div className="text-center">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-500 to-purple-600 flex items-center justify-center space-x-1 sm:space-x-2">
+                <Users size={16} className="text-purple-400 sm:w-6 sm:h-6" />
                 <span>MULTIPLAYER CASINO</span>
-                <Sparkles size={24} className="text-blue-400" />
+                <Sparkles size={16} className="text-blue-400 sm:w-6 sm:h-6" />
               </h1>
-              <p className="text-purple-300 text-sm font-medium">Pass & Play • Premium Gaming</p>
+              <p className="text-purple-300 text-xs sm:text-sm font-medium">Pass & Play • Premium Gaming</p>
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 self-end sm:self-auto">
               <button
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-3 rounded-xl bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white transition-all shadow-lg"
+                className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white transition-all shadow-lg touch-manipulation"
               >
-                {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                {soundEnabled ? <Volume2 size={14} className="sm:w-4 sm:h-4" /> : <VolumeX size={14} className="sm:w-4 sm:h-4" />}
               </button>
               
               <button
                 onClick={handleNewGame}
-                className="px-4 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold rounded-xl transition-all text-sm shadow-lg border border-purple-400/50"
+                className="px-2 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold rounded-lg sm:rounded-xl transition-all text-xs sm:text-sm shadow-lg border border-purple-400/50 touch-manipulation"
               >
                 New Game
               </button>
@@ -145,10 +145,10 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
           </div>
           
           {/* Responsive Casino Game Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
             {/* Player 2 Hand - Top on mobile, Left on desktop */}
-            <div className="xl:col-span-1 order-1 xl:order-1">
-              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-2xl border border-purple-500/30 shadow-2xl">
+            <div className="lg:col-span-1 order-1 lg:order-1">
+              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-xl sm:rounded-2xl border border-purple-500/30 shadow-2xl">
                 <PlayerHand
                   player={gameState.players[1]}
                   isCurrentPlayer={gameState.currentPlayerIndex === 1}
@@ -162,15 +162,15 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
             </div>
             
             {/* Game Board and Controls - Center */}
-            <div className="xl:col-span-1 order-2 xl:order-2 space-y-4">
-              <div className="bg-gradient-to-br from-emerald-800/80 via-emerald-900/80 to-emerald-800/80 backdrop-blur-md rounded-2xl border border-emerald-500/30 shadow-2xl">
+            <div className="lg:col-span-1 order-2 lg:order-2 space-y-3 sm:space-y-4">
+              <div className="bg-gradient-to-br from-emerald-800/80 via-emerald-900/80 to-emerald-800/80 backdrop-blur-md rounded-xl sm:rounded-2xl border border-emerald-500/30 shadow-2xl">
                 <GameBoard
                   gameState={gameState}
                   onDrawCard={handleDrawCard}
                 />
               </div>
               
-              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-2xl border border-blue-500/30 shadow-2xl">
+              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-xl sm:rounded-2xl border border-blue-500/30 shadow-2xl">
                 <GameControls
                   gameState={gameState}
                   selectedCards={selectedCards}
@@ -183,8 +183,8 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
             </div>
             
             {/* Player 1 Hand - Bottom on mobile, Right on desktop */}
-            <div className="xl:col-span-1 order-3 xl:order-3">
-              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-2xl border border-blue-500/30 shadow-2xl">
+            <div className="lg:col-span-1 order-3 lg:order-3">
+              <div className="bg-gradient-to-br from-slate-800/80 via-slate-900/80 to-slate-800/80 backdrop-blur-md rounded-xl sm:rounded-2xl border border-blue-500/30 shadow-2xl">
                 <PlayerHand
                   player={gameState.players[0]}
                   isCurrentPlayer={gameState.currentPlayerIndex === 0}
@@ -199,7 +199,7 @@ export const MultiplayerGame: React.FC<MultiplayerGameProps> = ({ onBackToMenu }
           </div>
           
           {/* Game Status */}
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-6">
             <GameStatus gameState={gameState} onNewGame={handleNewGame} />
           </div>
         </div>
