@@ -55,7 +55,6 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const challengesUnsubscribeRef = useRef<(() => void) | null>(null);
   const friendRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
   const sentRequestsUnsubscribeRef = useRef<(() => void) | null>(null);
-  const listenersSetupRef = useRef(false);
   const mountedRef = useRef(true);
 
   // Memoize queries to prevent duplicate listeners
@@ -64,8 +63,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     return query(
       collection(db, 'challenges'),
       where('toUserId', '==', user.uid),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'pending')
     );
   }, [user?.uid]);
 
@@ -74,8 +72,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
     return query(
       collection(db, 'friendRequests'),
       where('toUserId', '==', user.uid),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'pending')
     );
   }, [user?.uid]);
 
@@ -91,25 +88,28 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   useEffect(() => {
     mountedRef.current = true;
     
-    if (isOpen && user && !listenersSetupRef.current) {
+    if (isOpen && user) {
       console.log("Setting up friends modal listeners");
       loadAllUsers();
       loadFriends();
       setupRealtimeListeners();
-      listenersSetupRef.current = true;
-    } else if (!isOpen || !user) {
+    } else {
       cleanupListeners();
-      listenersSetupRef.current = false;
     }
 
+    // Always return cleanup function
     return () => {
-      if (!isOpen) {
-        mountedRef.current = false;
-        cleanupListeners();
-        listenersSetupRef.current = false;
-      }
+      cleanupListeners();
     };
   }, [isOpen, user]);
+
+  // Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      cleanupListeners();
+    };
+  }, []);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -142,9 +142,9 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
   const setupRealtimeListeners = () => {
     if (!user?.uid || !challengesQuery || !incomingRequestsQuery || !sentRequestsQuery || !mountedRef.current) return;
 
-    // Don't setup if already setup
+    // If any listeners are already active, clean them up first to ensure a clean slate
     if (challengesUnsubscribeRef.current || friendRequestsUnsubscribeRef.current || sentRequestsUnsubscribeRef.current) {
-      return;
+      cleanupListeners();
     }
 
     try {
@@ -173,6 +173,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         const appError = ErrorHandler.handleFirebaseError(error, 'loading challenges');
         setError(appError);
         setConnectionStatus('disconnected');
+        // Cleanup this specific listener on error
+        if (challengesUnsubscribeRef.current) {
+          challengesUnsubscribeRef.current();
+          challengesUnsubscribeRef.current = null;
+        }
       });
 
       // Set up friend requests listener
@@ -191,6 +196,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         const appError = ErrorHandler.handleFirebaseError(error, 'loading friend requests');
         setError(appError);
         setConnectionStatus('disconnected');
+        // Cleanup this specific listener on error
+        if (friendRequestsUnsubscribeRef.current) {
+          friendRequestsUnsubscribeRef.current();
+          friendRequestsUnsubscribeRef.current = null;
+        }
       });
 
       // Set up sent requests listener
@@ -214,6 +224,11 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
         const appError = ErrorHandler.handleFirebaseError(error, 'loading sent requests');
         setError(appError);
         setConnectionStatus('disconnected');
+        // Cleanup this specific listener on error
+        if (sentRequestsUnsubscribeRef.current) {
+          sentRequestsUnsubscribeRef.current();
+          sentRequestsUnsubscribeRef.current = null;
+        }
       });
 
     } catch (error: any) {
@@ -222,6 +237,7 @@ export const EnhancedFriendsModal: React.FC<EnhancedFriendsModalProps> = ({
       const appError = ErrorHandler.handleFirebaseError(error, 'setting up real-time listeners');
       setError(appError);
       setConnectionStatus('disconnected');
+      cleanupListeners();
     }
   };
 

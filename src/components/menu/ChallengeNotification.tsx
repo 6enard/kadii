@@ -28,7 +28,6 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
   
   // Use ref to track the listener and prevent multiple subscriptions
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const listenerSetupRef = useRef(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -37,33 +36,37 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
     if (!user?.uid) {
       setAcceptedChallenges([]);
       setShowNotification(false);
-      // Clean up any existing listener
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-        listenerSetupRef.current = false;
-      }
+      cleanupListener();
       return;
     }
 
-    // Only setup listener if not already setup
-    if (!listenerSetupRef.current) {
+    // Setup listener if not already active
+    if (!unsubscribeRef.current) {
       console.log("Setting up challenge notification listener");
       setupChallengeListener();
-      listenerSetupRef.current = true;
     }
 
-    // Cleanup function
+    // Always return cleanup function
     return () => {
-      if (!mountedRef.current) {
-        if (unsubscribeRef.current) {
-          unsubscribeRef.current();
-          unsubscribeRef.current = null;
-          listenerSetupRef.current = false;
-        }
-      }
+      cleanupListener();
     };
   }, [user?.uid]);
+
+  // Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      cleanupListener();
+    };
+  }, []);
+
+  const cleanupListener = () => {
+    if (unsubscribeRef.current) {
+      console.log("Cleaning up challenge notification listener");
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+  };
 
   const setupChallengeListener = () => {
     if (!user?.uid || unsubscribeRef.current || !mountedRef.current) return;
@@ -102,11 +105,12 @@ export const ChallengeNotification: React.FC<ChallengeNotificationProps> = ({ on
       }, (error) => {
         console.error('Error listening to challenges:', error);
         
-        // For any errors, reset state
+        // For any errors, reset state and cleanup
         if (mountedRef.current) {
           setAcceptedChallenges([]);
           setShowNotification(false);
         }
+        cleanupListener();
       });
 
     } catch (error) {
