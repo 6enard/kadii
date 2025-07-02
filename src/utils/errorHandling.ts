@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface AppError {
   code: string;
   message: string;
@@ -177,7 +179,7 @@ export const createErrorBoundary = (fallback: React.ComponentType<{ error: Error
     render() {
       if (this.state.hasError && this.state.error) {
         const FallbackComponent = fallback;
-        return <FallbackComponent error={this.state.error} retry={this.retry} />;
+        return React.createElement(FallbackComponent, { error: this.state.error, retry: this.retry });
       }
 
       return this.props.children;
