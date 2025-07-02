@@ -47,21 +47,50 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [musicVolume, setMusicVolume] = useState(0.3);
   const [soundVolume, setSoundVolume] = useState(0.7);
   
-  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const musicGainNodeRef = useRef<GainNode | null>(null);
+  const musicOscillatorsRef = useRef<OscillatorNode[]>([]);
   const soundCacheRef = useRef<Map<SoundType, HTMLAudioElement>>(new Map());
+  const musicIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Classical music note frequencies (in Hz)
+  const notes = {
+    C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+    C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
+    C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94
+  };
+
+  // Classical chord progressions
+  const chordProgressions = [
+    // I-V-vi-IV (very popular in classical)
+    [
+      [notes.C4, notes.E4, notes.G4], // C major
+      [notes.G3, notes.B3, notes.D4], // G major
+      [notes.A3, notes.C4, notes.E4], // A minor
+      [notes.F3, notes.A3, notes.C4]  // F major
+    ],
+    // ii-V-I (jazz/classical)
+    [
+      [notes.D3, notes.F3, notes.A3], // D minor
+      [notes.G3, notes.B3, notes.D4], // G major
+      [notes.C4, notes.E4, notes.G4], // C major
+      [notes.C4, notes.E4, notes.G4]  // C major
+    ]
+  ];
+
+  // Beautiful classical melodies
+  const melodies = [
+    // Pachelbel's Canon inspired
+    [notes.D5, notes.A4, notes.B4, notes.F4, notes.G4, notes.D4, notes.G4, notes.A4],
+    // Bach inspired
+    [notes.C5, notes.B4, notes.A4, notes.G4, notes.F4, notes.E4, notes.D4, notes.C4],
+    // Mozart inspired
+    [notes.E5, notes.D5, notes.C5, notes.D5, notes.E5, notes.E5, notes.E5, notes.D5]
+  ];
 
   // Initialize audio system
   useEffect(() => {
-    // Create background music
-    backgroundMusicRef.current = new Audio();
-    backgroundMusicRef.current.loop = true;
-    backgroundMusicRef.current.volume = musicVolume;
-    
-    // Use a royalty-free ambient music URL or create a simple tone
-    // For now, we'll create a simple ambient tone using Web Audio API
-    createBackgroundMusic();
-    
-    // Preload sound effects
+    initializeAudioContext();
     preloadSounds();
     
     // Load settings from localStorage
@@ -76,72 +105,134 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (savedSoundVolume !== null) setSoundVolume(parseFloat(savedSoundVolume));
     
     return () => {
-      if (backgroundMusicRef.current) {
-        backgroundMusicRef.current.pause();
-        backgroundMusicRef.current = null;
+      stopBackgroundMusic();
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
       }
       soundCacheRef.current.clear();
     };
   }, []);
 
-  // Create ambient background music using Web Audio API
-  const createBackgroundMusic = () => {
+  const initializeAudioContext = () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       
-      // Create a simple ambient soundscape
-      const createTone = (frequency: number, type: OscillatorType = 'sine') => {
+      // Create master gain node for music
+      musicGainNodeRef.current = audioContextRef.current.createGain();
+      musicGainNodeRef.current.connect(audioContextRef.current.destination);
+      musicGainNodeRef.current.gain.setValueAtTime(musicVolume, audioContextRef.current.currentTime);
+      
+    } catch (error) {
+      console.log('Web Audio API not supported');
+    }
+  };
+
+  const createClassicalMusic = () => {
+    if (!audioContextRef.current || !musicGainNodeRef.current) return;
+
+    const audioContext = audioContextRef.current;
+    const masterGain = musicGainNodeRef.current;
+
+    // Clear existing oscillators
+    stopBackgroundMusic();
+
+    let currentChordIndex = 0;
+    let currentMelodyIndex = 0;
+    let currentMelodyNote = 0;
+    const currentProgression = chordProgressions[0];
+    const currentMelody = melodies[Math.floor(Math.random() * melodies.length)];
+
+    const playChord = (chord: number[], duration: number = 4) => {
+      const chordOscillators: OscillatorNode[] = [];
+      
+      chord.forEach((frequency, index) => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
-        oscillator.type = type;
+        oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
         
+        // Soft attack and release for classical feel
         gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.02, audioContext.currentTime + 2);
+        gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.5);
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime + duration - 0.5);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(masterGain);
         
-        return { oscillator, gainNode };
-      };
-
-      // Create multiple tones for ambient effect
-      const tones = [
-        createTone(220), // A3
-        createTone(330), // E4
-        createTone(440), // A4
-        createTone(660), // E5
-      ];
-
-      // Start the ambient tones with slight delays
-      tones.forEach((tone, index) => {
-        tone.oscillator.start(audioContext.currentTime + index * 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration);
+        
+        chordOscillators.push(oscillator);
       });
+      
+      musicOscillatorsRef.current.push(...chordOscillators);
+    };
 
-      // Create a simple rhythm pattern
-      const createRhythm = () => {
-        const now = audioContext.currentTime;
-        tones.forEach((tone, index) => {
-          // Fade in and out pattern
-          tone.gainNode.gain.setValueAtTime(0.01, now);
-          tone.gainNode.gain.linearRampToValueAtTime(0.03, now + 1);
-          tone.gainNode.gain.linearRampToValueAtTime(0.01, now + 3);
-          tone.gainNode.gain.linearRampToValueAtTime(0.02, now + 5);
-          tone.gainNode.gain.linearRampToValueAtTime(0.01, now + 8);
-        });
-        
-        // Schedule next pattern
-        setTimeout(createRhythm, 8000);
-      };
+    const playMelodyNote = (frequency: number, duration: number = 1) => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.type = 'triangle'; // Warmer sound for melody
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+      
+      // Gentle envelope for melody
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.15, audioContext.currentTime + duration - 0.1);
+      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(masterGain);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + duration);
+      
+      musicOscillatorsRef.current.push(oscillator);
+    };
 
-      if (isMusicEnabled) {
-        createRhythm();
+    const scheduleMusic = () => {
+      if (!isMusicEnabled) return;
+      
+      // Play chord progression
+      const currentChord = currentProgression[currentChordIndex];
+      playChord(currentChord, 4);
+      
+      // Play melody notes over the chord
+      for (let i = 0; i < 4; i++) {
+        setTimeout(() => {
+          if (isMusicEnabled && currentMelodyNote < currentMelody.length) {
+            playMelodyNote(currentMelody[currentMelodyNote], 0.8);
+            currentMelodyNote = (currentMelodyNote + 1) % currentMelody.length;
+          }
+        }, i * 1000);
       }
-    } catch (error) {
-      console.log('Web Audio API not supported, using fallback');
-      // Fallback to a simple audio file or silence
+      
+      currentChordIndex = (currentChordIndex + 1) % currentProgression.length;
+      
+      // Schedule next chord
+      musicIntervalRef.current = setTimeout(scheduleMusic, 4000);
+    };
+
+    // Start the music
+    scheduleMusic();
+  };
+
+  const stopBackgroundMusic = () => {
+    if (musicIntervalRef.current) {
+      clearTimeout(musicIntervalRef.current);
+      musicIntervalRef.current = null;
     }
+    
+    musicOscillatorsRef.current.forEach(oscillator => {
+      try {
+        oscillator.stop();
+      } catch (e) {
+        // Oscillator might already be stopped
+      }
+    });
+    musicOscillatorsRef.current = [];
   };
 
   // Preload sound effects using data URLs for simple tones
@@ -231,8 +322,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     localStorage.setItem('musicVolume', musicVolume.toString());
-    if (backgroundMusicRef.current) {
-      backgroundMusicRef.current.volume = musicVolume;
+    if (musicGainNodeRef.current && audioContextRef.current) {
+      musicGainNodeRef.current.gain.setValueAtTime(musicVolume, audioContextRef.current.currentTime);
     }
   }, [musicVolume]);
 
@@ -243,16 +334,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [soundVolume]);
 
+  // Handle music enable/disable
+  useEffect(() => {
+    if (isMusicEnabled && audioContextRef.current) {
+      // Resume audio context if suspended
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().then(() => {
+          createClassicalMusic();
+        });
+      } else {
+        createClassicalMusic();
+      }
+    } else {
+      stopBackgroundMusic();
+    }
+  }, [isMusicEnabled]);
+
   const toggleMusic = () => {
     setIsMusicEnabled(!isMusicEnabled);
-    if (!isMusicEnabled && backgroundMusicRef.current) {
-      backgroundMusicRef.current.play().catch(() => {
-        // Handle autoplay restrictions
-        console.log('Music autoplay blocked by browser');
-      });
-    } else if (backgroundMusicRef.current) {
-      backgroundMusicRef.current.pause();
-    }
   };
 
   const toggleSound = () => {
