@@ -166,7 +166,7 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
     newState.turnHistory.push(`${currentPlayer.name} played ${playedCards.length} penalty card(s) (+${totalPenalty} cards)`);
   }
   
-  // Handle Ace (wild card) effects - FIXED: Don't ask for suit when countering
+  // Handle Ace (wild card) effects - FIXED: Always ask for suit when answering questions
   if (hasWild) {
     if (gameState.drawStack > 0) {
       // Ace is countering penalty - don't change suit, just counter
@@ -174,14 +174,15 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
       newState.turnHistory.push(`${currentPlayer.name} countered penalty with Ace(s)`);
       // When countering, the suit remains the same as the card before the penalty
       // Don't ask for suit selection and don't change selectedSuit
-    } else if (gameState.pendingQuestion) {
-      // Ace is answering a question - don't ask for suit selection
-      // This case is already handled above
     } else {
-      // Regular Ace play - ask for suit selection
+      // Regular Ace play OR answering question - ALWAYS ask for suit selection
       if (options.declaredSuit) {
         newState.selectedSuit = options.declaredSuit;
-        newState.turnHistory.push(`${currentPlayer.name} played Ace(s) and chose ${options.declaredSuit}`);
+        if (gameState.pendingQuestion) {
+          newState.turnHistory.push(`${currentPlayer.name} answered question with Ace(s) and chose ${options.declaredSuit}`);
+        } else {
+          newState.turnHistory.push(`${currentPlayer.name} played Ace(s) and chose ${options.declaredSuit}`);
+        }
       } else {
         newState.gamePhase = 'selectingSuit';
         return newState;
@@ -231,9 +232,9 @@ export function playCards(gameState: GameState, options: PlayCardOptions): GameS
   }
   
   // Reset selected suit if not wild card (unless countering)
-  if (!hasWild || (hasWild && (gameState.drawStack > 0 || gameState.pendingQuestion))) {
-    // Don't reset suit when Ace is used for countering or answering questions
-    if (!(hasWild && (gameState.drawStack > 0 || gameState.pendingQuestion))) {
+  if (!hasWild || (hasWild && gameState.drawStack > 0)) {
+    // Don't reset suit when Ace is used for countering
+    if (!(hasWild && gameState.drawStack > 0)) {
       newState.selectedSuit = null;
     }
   }
@@ -480,8 +481,8 @@ export function makeAIMove(gameState: GameState, difficulty: AIDifficulty): Game
   
   const hasAce = selectedCards.some(card => card.rank === 'A');
   
-  // Handle Ace (wild card) suit selection - only for regular play, not countering
-  if (hasAce && newState.drawStack === 0 && !newState.pendingQuestion) {
+  // Handle Ace (wild card) suit selection - for regular play OR answering questions
+  if (hasAce && newState.drawStack === 0) {
     const bestSuit = selectBestSuit(currentPlayer.hand, difficulty);
     return playCards(newState, { 
       cardIds: selectedCombination, 

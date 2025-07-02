@@ -122,103 +122,101 @@ export const SinglePlayerGame: React.FC<SinglePlayerGameProps> = ({ onBackToMenu
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={onBackToMenu}
-              className="flex items-center space-x-2 text-white hover:text-green-100 transition-colors"
-            >
-              <ArrowLeft size={20} />
-              <span>Back to Menu</span>
-            </button>
-            
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all"
-              >
-                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-              </button>
-              
-              <button
-                onClick={() => setShowDifficultyModal(true)}
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all"
-              >
-                <Settings size={20} />
-                <span>Difficulty: {gameState.aiDifficulty}</span>
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={onBackToMenu}
+            className="flex items-center space-x-2 text-white hover:text-green-100 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            <span>Back to Menu</span>
+          </button>
+          
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-white">Kadi vs Computer</h1>
+            <p className="text-green-100 text-sm">Kenyan Card Game</p>
           </div>
           
-          <h1 className="text-4xl font-bold text-white mb-2">Kadi vs Computer</h1>
-          <p className="text-green-100">Kenyan Card Game</p>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all"
+            >
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+            
+            <button
+              onClick={() => setShowDifficultyModal(true)}
+              className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all text-sm"
+            >
+              <Settings size={16} />
+              <span>{gameState.aiDifficulty}</span>
+            </button>
+            
+            <button
+              onClick={handleNewGame}
+              className="px-3 py-2 bg-white text-green-600 font-semibold rounded-lg hover:bg-gray-100 transition-all text-sm"
+            >
+              New Game
+            </button>
+          </div>
         </div>
         
-        {/* Player 2 (Computer) */}
-        <div className="mb-6">
-          <PlayerHand
-            player={gameState.players[1]}
-            isCurrentPlayer={gameState.currentPlayerIndex === 1}
-            selectedCards={gameState.currentPlayerIndex === 1 ? selectedCards : []}
-            playableCards={gameState.currentPlayerIndex === 1 ? playableCards : []}
-            onCardClick={handleCardClick}
-            isMyTurn={gameState.currentPlayerIndex === 1}
-          />
-        </div>
-        
-        {/* Game Board */}
-        <div className="mb-6">
-          <GameBoard
-            gameState={gameState}
-            onDrawCard={handleDrawCard}
-          />
-        </div>
-        
-        {/* Game Controls */}
-        <div className="mb-6">
-          <GameControls
-            gameState={gameState}
-            selectedCards={selectedCards}
-            onPlayCards={handlePlayCards}
-            onDeclareNikoKadi={handleDeclareNikoKadi}
-            onDrawPenalty={handleDrawPenalty}
-            canPlaySelected={canPlaySelected}
-          />
-        </div>
-        
-        {/* Player 1 (Current User) */}
-        <div className="mb-6">
-          <PlayerHand
-            player={gameState.players[0]}
-            isCurrentPlayer={gameState.currentPlayerIndex === 0}
-            selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
-            playableCards={playableCards}
-            onCardClick={handleCardClick}
-            isMyTurn={!isComputerTurn}
-          />
+        {/* Compact Game Layout - Chess.com style */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-8rem)]">
+          {/* Left Column - Computer Hand */}
+          <div className="lg:col-span-1 flex flex-col">
+            <PlayerHand
+              player={gameState.players[1]}
+              isCurrentPlayer={gameState.currentPlayerIndex === 1}
+              selectedCards={[]}
+              playableCards={[]}
+              onCardClick={() => {}}
+              isMyTurn={false}
+              hideCards={true} // Hide computer cards
+            />
+          </div>
+          
+          {/* Center Column - Game Board and Controls */}
+          <div className="lg:col-span-1 flex flex-col space-y-4">
+            <GameBoard
+              gameState={gameState}
+              onDrawCard={handleDrawCard}
+            />
+            
+            <GameControls
+              gameState={gameState}
+              selectedCards={selectedCards}
+              onPlayCards={handlePlayCards}
+              onDeclareNikoKadi={handleDeclareNikoKadi}
+              onDrawPenalty={handleDrawPenalty}
+              canPlaySelected={canPlaySelected}
+            />
+          </div>
+          
+          {/* Right Column - Player Hand */}
+          <div className="lg:col-span-1 flex flex-col">
+            <PlayerHand
+              player={gameState.players[0]}
+              isCurrentPlayer={gameState.currentPlayerIndex === 0}
+              selectedCards={gameState.currentPlayerIndex === 0 ? selectedCards : []}
+              playableCards={playableCards}
+              onCardClick={handleCardClick}
+              isMyTurn={!isComputerTurn}
+              hideCards={false}
+            />
+          </div>
         </div>
         
         {/* Game Status */}
         <GameStatus gameState={gameState} onNewGame={handleNewGame} />
-        
-        {/* Suit Selector Modal */}
-        {gameState.gamePhase === 'selectingSuit' && (
-          <SuitSelector onSelectSuit={handleSelectSuit} />
-        )}
-        
-        {/* New Game Button */}
-        <div className="text-center">
-          <button
-            onClick={handleNewGame}
-            className="px-6 py-3 bg-white text-green-600 font-bold rounded-lg
-                       hover:bg-gray-100 transition-all duration-200 transform hover:scale-105"
-          >
-            New Game
-          </button>
-        </div>
       </div>
+      
+      {/* Suit Selector Modal */}
+      {gameState.gamePhase === 'selectingSuit' && (
+        <SuitSelector onSelectSuit={handleSelectSuit} />
+      )}
       
       {/* Difficulty Modal */}
       {showDifficultyModal && (
