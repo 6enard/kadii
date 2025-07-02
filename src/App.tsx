@@ -4,7 +4,8 @@ import { MainMenu } from './components/menu/MainMenu';
 import { SinglePlayerGame } from './components/game/SinglePlayerGame';
 import { MultiplayerGame } from './components/game/MultiplayerGame';
 import { OnlineMultiplayerGame } from './components/game/OnlineMultiplayerGame';
-import { ErrorFallback, createErrorBoundary } from './components/common/ErrorBoundary';
+import { ErrorFallback } from './components/common/ErrorBoundary';
+import { createErrorBoundary } from './utils/errorHandling';
 
 type GameMode = 'menu' | 'singlePlayer' | 'multiplayer' | 'onlineMultiplayer';
 
